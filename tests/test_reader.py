@@ -48,6 +48,33 @@ def test_read_accepts_binary_io(cp850_basic_dbf: Path) -> None:
     assert len(data.journal.rows) == 3
 
 
+def test_non_seekable_binary_io_raises_structured_error(cp850_basic_dbf: Path) -> None:
+    """CR-01: A non-seekable BinaryIO stream raises ContaPlusReadError, not bare OSError."""
+    import io as _io
+
+    class NonSeekableStream(_io.RawIOBase):
+        """Wraps bytes but overrides seekable() to return False."""
+
+        def __init__(self, data: bytes) -> None:
+            super().__init__()
+            self._data = data
+
+        def read(self, n: int = -1) -> bytes:  # type: ignore[override]
+            return self._data
+
+        def seekable(self) -> bool:
+            return False
+
+        def seek(self, pos: int, whence: int = 0) -> int:
+            raise OSError("Illegal seek")
+
+    stream = NonSeekableStream(cp850_basic_dbf.read_bytes())
+    with pytest.raises(ContaPlusReadError) as exc_info:
+        read(stream)
+    # Must raise ContaPlusReadError, not propagate raw OSError
+    assert "seekable" in exc_info.value.message.lower() or "not seekable" in exc_info.value.message.lower()
+
+
 # ---------------------------------------------------------------------------
 # INPUT-03: Unsupported formats rejected with structured error
 # ---------------------------------------------------------------------------

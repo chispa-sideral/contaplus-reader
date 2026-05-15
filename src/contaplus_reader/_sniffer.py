@@ -44,8 +44,24 @@ def sniff(data: bytes | io.IOBase) -> None:
         first_byte: int | None = data[0] if data else None
     else:
         first_byte_bytes = data.read(1)
-        if hasattr(data, "seek"):
+        if hasattr(data, "seekable") and data.seekable():
             data.seek(0)
+        elif hasattr(data, "seekable") and not data.seekable():
+            raise ContaPlusReadError(
+                row_index=-1,
+                column=None,
+                message="Input stream is not seekable; provide bytes or a seekable BinaryIO",
+            )
+        else:
+            # Safety fallback: no seekable attribute -- try seek, wrap OSError
+            try:
+                data.seek(0)
+            except OSError:
+                raise ContaPlusReadError(
+                    row_index=-1,
+                    column=None,
+                    message="Input stream is not seekable; provide bytes or a seekable BinaryIO",
+                ) from None
         first_byte = first_byte_bytes[0] if first_byte_bytes else None
 
     if first_byte is None or first_byte not in _KNOWN_DBF_VERSION_BYTES:
