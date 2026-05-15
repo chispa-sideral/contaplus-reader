@@ -386,6 +386,24 @@ def test_column_resolution_falls_back_to_debe_haber(
 
 
 # ---------------------------------------------------------------------------
+# CR-03: ContaPlusJournal.rows is an immutable tuple
+# ---------------------------------------------------------------------------
+
+def test_journal_rows_is_immutable_tuple(cp850_basic_dbf: Path) -> None:
+    """CR-03: journal.rows must be a tuple (immutable), not a list."""
+    data = read(cp850_basic_dbf.read_bytes())
+    journal = data.journal
+    assert journal is not None
+    assert isinstance(journal.rows, tuple)
+    with pytest.raises(AttributeError, match="append"):
+        journal.rows.append  # type: ignore[attr-defined]
+        # Accessing .append raises AttributeError on tuple
+    # Verify append actually raises when called
+    with pytest.raises(AttributeError):
+        journal.rows.append(journal.rows[0])  # type: ignore[attr-defined]
+
+
+# ---------------------------------------------------------------------------
 # API-04: Output shape -- JournalRow has expected fields
 # ---------------------------------------------------------------------------
 

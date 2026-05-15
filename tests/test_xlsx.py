@@ -40,7 +40,7 @@ def _sample_row() -> JournalRow:
 
 def _make_journal(*rows: JournalRow) -> ContaPlusJournal:
     """Build a ContaPlusJournal from JournalRow instances."""
-    return ContaPlusJournal(rows=list(rows), skipped_memo=0)
+    return ContaPlusJournal(rows=rows, skipped_memo=0)
 
 
 # ---------------------------------------------------------------------------

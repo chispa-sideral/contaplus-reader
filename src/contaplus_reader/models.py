@@ -111,12 +111,12 @@ class JournalRow:
 class ContaPlusJournal:
     """Validated journal extracted from DIARIO.DBF.
 
-    rows: all non-deleted, non-memo journal lines.
+    rows: immutable sequence of validated non-deleted non-memo journal lines.
     skipped_memo: count of both-zero rows skipped (D-C3).
     source_name: optional provenance label supplied by caller.
     """
 
-    rows: list[JournalRow]
+    rows: tuple[JournalRow, ...]
     skipped_memo: int = 0
     source_name: str | None = None
 

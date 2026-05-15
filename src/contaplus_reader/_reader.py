@@ -209,7 +209,7 @@ def _read_dbf_path(
             )
 
         return ContaPlusJournal(
-            rows=rows,
+            rows=tuple(rows),
             skipped_memo=skipped_memo,
             source_name=source_name,
         )
