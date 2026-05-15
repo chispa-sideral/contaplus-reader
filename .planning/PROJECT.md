@@ -88,6 +88,14 @@ else (CLI, PWA, styling) is delivery; correct extraction cannot fail.
   `pandas`, and `openpyxl` are all available in-browser. Open research questions
   in `SEED.md` cover cold-load UX, `micropip` resolution, service-worker caching,
   in-browser XLSX writing, and zip-slip-safe extraction from an in-memory buffer.
+- Confidential real-world test data: the user has placed real ContaPlus backup
+  archives (5 `.zip` files — 4 single-company, 1 multi-company) in
+  `pii-test-data/`. This directory is git-ignored and internal-only — its
+  contents must never be committed, read into output, or quoted in public
+  material. It is a local validation gate for the table schemas the SEED leaves
+  under-documented (`SUBCTA.DBF` field-name variants, `venci.dbf`/`prede.dbf`
+  layouts). The committed test suite uses only synthetic, blob-free fixtures
+  generated at test-collection time — no real files ever enter the repo.
 
 ## Constraints
 
@@ -113,6 +121,7 @@ else (CLI, PWA, styling) is delivery; correct extraction cannot fail.
 | Journal enriched with `SUBCTA.DBF` names when available | Account codes alone aren't human-readable; additive, so tax-workbench's wrapper is unaffected | — Pending |
 | Shared, templated XLSX renderer for CLI and PWA | One renderer / template = consistent, nicely-styled output across both consumers | — Pending |
 | PWA runtime (Pyodide vs PyScript) deferred to research | Cold-load UX and `micropip` resolution must be validated before committing | — Pending |
+| Real ContaPlus backups kept in git-ignored `pii-test-data/` | Confidential client data — never committed; local-only schema validation gate. Committed tests use synthetic blob-free fixtures | — Pending |
 
 ## Evolution
 
