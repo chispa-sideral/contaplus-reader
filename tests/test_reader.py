@@ -244,6 +244,26 @@ def test_negative_haber_passes_through(
     assert journal.rows[0].debe == 0.0
 
 
+def test_negative_debe_positive_haber_raises(
+    diario_dbf_builder: Callable[[list[dict[str, Any]]], Path],
+) -> None:
+    """D-C2: row with negative debe AND positive haber is still both-non-zero — must raise."""
+    path = diario_dbf_builder([
+        {
+            "asien": 1,
+            "fecha": _dt.date(2025, 1, 1),
+            "subcta": "4300000",
+            "contra": "",
+            "concepto": "x",
+            "eurodebe": -10.0,
+            "eurohaber": 50.0,
+        },
+    ])
+    with pytest.raises(ContaPlusReadError) as exc_info:
+        read(path.read_bytes())
+    assert exc_info.value.row_index >= 0
+
+
 # ---------------------------------------------------------------------------
 # JRNL-03 / D-C2: Both-non-zero raises ContaPlusReadError
 # ---------------------------------------------------------------------------

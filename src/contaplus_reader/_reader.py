@@ -152,9 +152,9 @@ def _read_dbf_path(
             debe = float(record.get(debe_col) or 0)
             haber = float(record.get(haber_col) or 0)
 
-            # D-C2: both strictly positive is non-standard -- raise
-            # NOTE: uses > 0, NOT != 0 (Pitfall 2 -- negatives must pass through per D-C1)
-            if debe > 0 and haber > 0:
+            # D-C2: both-non-zero (any sign) is non-standard -- raise.
+            # D-C1 negatives (-10, 0) or (0, -50) still pass; (-10, 50) does not.
+            if debe != 0 and haber != 0:
                 raise ContaPlusReadError(
                     row_index=idx,
                     column=None,
