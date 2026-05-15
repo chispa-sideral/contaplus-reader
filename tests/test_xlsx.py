@@ -276,6 +276,26 @@ def test_column_widths_are_set() -> None:
     assert col_a_width > 0
 
 
+def test_column_width_not_truncated_by_zero_values() -> None:
+    """WR-02: Column with haber=0.0 must not have zero width (0.0 must not count as empty)."""
+    from contaplus_reader.xlsx import render_journal
+
+    row = JournalRow(
+        fecha=datetime.date(2025, 1, 1),
+        cuenta="4300",
+        subcuenta="4300000",
+        debe=1500.75,
+        haber=0.0,
+        concepto="Test zero haber width",
+    )
+    journal = _make_journal(row)
+    ws = load_workbook(io.BytesIO(render_journal(journal))).active
+    # Column E is Haber (index 5); header "Haber" has len=5; data 0.0 has len=3
+    haber_col_width = ws.column_dimensions["E"].width  # type: ignore[union-attr]
+    assert haber_col_width is not None
+    assert haber_col_width > 0
+
+
 # ---------------------------------------------------------------------------
 # Data round-trip
 # ---------------------------------------------------------------------------

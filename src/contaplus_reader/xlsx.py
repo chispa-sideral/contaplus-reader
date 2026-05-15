@@ -71,7 +71,7 @@ def render_journal(journal: ContaPlusJournal) -> bytes:
     # D-10: Auto-size columns (openpyxl has no built-in autofit).
     # Pitfall 4: use col_cells[0].column_letter, NOT col_cells.column_letter.
     for col_cells in ws.columns:
-        max_len = max((len(str(c.value or "")) for c in col_cells), default=0)
+        max_len = max((len(str("" if c.value is None else c.value)) for c in col_cells), default=0)
         ws.column_dimensions[col_cells[0].column_letter].width = min(max_len + 2, 50)
 
     buf = io.BytesIO()
