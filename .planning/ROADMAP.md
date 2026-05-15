@@ -16,7 +16,7 @@ wheel). Every phase delivers something a user can run and verify end-to-end.
 
 Decimal phases appear between their surrounding integers in numeric order.
 
-- [ ] **Phase 1: Journal Slice** - Thin working vertical: bytes → DIARIO.DBF reader → XLSX → CLI
+- [x] **Phase 1: Journal Slice** - Thin working vertical: bytes → DIARIO.DBF reader → XLSX → CLI (completed 2026-05-15)
 - [ ] **Phase 2: ZIP & Subaccounts** - ZIP input, SUBCTA reader, journal name enrichment, group-level tables
 - [ ] **Phase 3: Full Tables, Balance & Lenient Path** - Operational-table readers, trial-balance computation, lenient conversion path, XLSX report sheet
 - [ ] **Phase 4: Full CLI & PyPI Publication** - Multi-company flag, stdout reporting, wheel published to PyPI
@@ -40,7 +40,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 Plans:
 - [x] 01-01-PLAN.md — Package scaffold, journal reader, models, bridge, sniffer, fixture factory, ~27 reader tests (completed 2026-05-15)
 - [x] 01-02-PLAN.md — XLSX renderer (Spanish headers, accounting format), Typer CLI, XLSX tests, CLI tests
-- [ ] 01-03-PLAN.md — README, .gitignore, uv build wheel, uvx smoke test (human checkpoint)
+- [x] 01-03-PLAN.md — README, .gitignore, uv build wheel, uvx smoke test (human checkpoint)
 
 ### Phase 2: ZIP & Subaccounts
 **Goal**: A user can convert a full ContaPlus backup `.zip` — including SUBCTA enrichment of the journal — to a multi-sheet `.xlsx`
@@ -98,7 +98,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Journal Slice | 2/3 | In Progress|  |
+| 1. Journal Slice | 3/3 | Complete   | 2026-05-15 |
 | 2. ZIP & Subaccounts | 0/TBD | Not started | - |
 | 3. Full Tables, Balance & Lenient Path | 0/TBD | Not started | - |
 | 4. Full CLI & PyPI Publication | 0/TBD | Not started | - |

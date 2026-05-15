@@ -38,10 +38,10 @@ completed: "2026-05-15"
 
 ## Performance
 
-- **Duration:** 7 min
+- **Duration:** ~22 min total (7 min Task 1 + human-verify checkpoint)
 - **Started:** 2026-05-15T15:27:00Z
-- **Completed:** 2026-05-15T15:34:33Z
-- **Tasks:** 1 (Task 2 is a human-verify checkpoint — pending)
+- **Completed:** 2026-05-15T15:50:00Z
+- **Tasks:** 2 (1 auto + 1 checkpoint:human-verify — APPROVED)
 - **Files modified:** 2
 
 ## Accomplishments
@@ -50,10 +50,25 @@ completed: "2026-05-15"
 - .gitignore extended with *.whl, .env, *.tmp while retaining existing pii-test-data/ and dist/ entries
 - `uv build` exits 0 — produces `dist/contaplus_reader-0.1.0-py3-none-any.whl` and `dist/contaplus_reader-0.1.0.tar.gz`
 - `uvx --from dist/contaplus_reader-0.1.0-py3-none-any.whl contaplus2xlsx --help` exits 0, shows correct usage
+- Human-verify checkpoint APPROVED: all walking skeleton E2E checks passed
+
+## Walking Skeleton Verification Evidence (human-verify checkpoint — APPROVED)
+
+| Check | Result |
+|-------|--------|
+| `uv run pytest` | 50/50 tests pass |
+| `uv build` | `dist/contaplus_reader-0.1.0-py3-none-any.whl` produced |
+| `uvx --from dist/contaplus_reader-0.1.0-py3-none-any.whl contaplus2xlsx --help` | exit 0, help text correct |
+| E2E convert: `contaplus2xlsx DIARIO.dbf out.xlsx` | exit 0, "out.xlsx — 3 journal rows" |
+| Overwrite guard (second run, no --force) | exit 1, "already exists" message |
+| Overwrite with --force | exit 0 |
+| Error case: non-DBF input | exit 1, Rich error panel "ContaPlus Read Error", no Python traceback |
+| XLSX structure | sheet "Diario", Spanish headers [Fecha, Cuenta, Subcuenta, Debe, Haber, Concepto], frozen header (A2), bold header, debe format `#,##0.00_);[Red](#,##0.00)`, fecha format `DD/MM/YYYY` |
 
 ## Task Commits
 
 1. **Task 1: README + .gitignore + uv build** - `15dbade` (chore)
+2. **Task 2: Human-verify checkpoint** — APPROVED, no code change
 
 ## Files Created/Modified
 
@@ -67,6 +82,15 @@ README already existed as a minimal placeholder from Plan 01. Expanded in-place 
 ## Deviations from Plan
 
 None - plan executed exactly as written. Both files already partially existed; task updated them to satisfy the full acceptance criteria.
+
+### Known Issue (non-blocking, not fixed)
+
+**[Informational] typer[all] extra no longer exists in typer 0.25.1**
+
+- **Found during:** uvx smoke test (Task 2 checkpoint verification)
+- **Issue:** `pyproject.toml` declares `typer[all]` as a dependency. Typer 0.25.1 does not publish an `all` extra — uvx prints a harmless warning: "The package typer==0.25.1 does not have an extra named 'all'". The CLI works correctly because rich is now bundled with typer by default.
+- **Fix:** Not fixed in this plan — the CLI is functional and the warning is non-blocking. A future phase should change the dependency to plain `typer` to eliminate the warning.
+- **Impact:** Warning only; no functional regression; all 50 tests pass; CLI exits 0.
 
 ## Known Stubs
 
@@ -86,12 +110,15 @@ None — no external service configuration required.
 
 ## Next Phase Readiness
 
-Walking skeleton is complete. Phase 1 deliverables pending human verification (checkpoint):
-- All 50 tests pass (test_reader.py + test_xlsx.py + test_cli.py)
-- Wheel builds and uvx runs from it
-- Human E2E smoke test (synthetic DBF → XLSX), overwrite guard, and error panel still require human checkpoint approval
+Phase 1 (Journal Slice) is COMPLETE. All Phase 1 success criteria met:
 
-After human approval, Phase 1 is complete and Phase 2 (ZIP support + secondary tables) can begin.
+1. `contaplus2xlsx DIARIO.DBF out.xlsx` produces a styled .xlsx with validated journal rows — VERIFIED
+2. CLI rejects invalid .dbf with Rich error panel naming the error, no Python traceback — VERIFIED
+3. `uv build` produces a wheel; `uvx contaplus2xlsx` installs and runs from it — VERIFIED
+4. Test suite uses synthetic blob-free fixtures; all ported tw-contaplus journal coverage passes (50/50) — VERIFIED
+5. `read(data: bytes | BinaryIO)` is the only entry point; no filesystem-path argument — VERIFIED
+
+Phase 2 (ZIP support + secondary tables) can begin. Future phases should address the `typer[all]` extra warning by changing the dependency to plain `typer`.
 
 ## Self-Check: PASSED
 
@@ -105,7 +132,8 @@ Commits exist:
 
 Test suite: 50/50 passed (uv run pytest tests/ -v)
 uvx smoke test: exits 0, help text confirmed
+Human-verify checkpoint: APPROVED — all E2E checks passed
 
 ---
 *Phase: 01-journal-slice*
-*Completed: 2026-05-15 (Task 1 only; checkpoint pending)*
+*Completed: 2026-05-15*

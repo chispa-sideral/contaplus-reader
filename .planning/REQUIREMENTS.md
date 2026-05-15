@@ -44,17 +44,17 @@ Requirements for the initial release. Each maps to roadmap phases.
 
 ### XLSX Rendering
 
-- [ ] **XLSX-01**: Shared, templated XLSX renderer produces a styled workbook with one sheet per extracted table
+- [x] **XLSX-01**: Shared, templated XLSX renderer produces a styled workbook with one sheet per extracted table
 - [ ] **XLSX-02**: Renderer includes a problems/report sheet listing rows the lenient path skipped or flagged
 - [ ] **XLSX-03**: Renderer marks the raw `BALAN` sheet with a visible "derived — may be unreliable" disclaimer
-- [ ] **XLSX-04**: Renderer is callable identically from the CLI and the PWA, with no filesystem assumptions
+- [x] **XLSX-04**: Renderer is callable identically from the CLI and the PWA, with no filesystem assumptions
 
 ### CLI (`contaplus2xlsx`)
 
-- [ ] **CLI-01**: `contaplus2xlsx` converts a single `.dbf`/`.zip` file to a styled `.xlsx`
+- [x] **CLI-01**: `contaplus2xlsx` converts a single `.dbf`/`.zip` file to a styled `.xlsx`
 - [ ] **CLI-02**: CLI selects a company in a multi-company backup via a flag
 - [ ] **CLI-03**: CLI reports row counts, skipped-memo count, and any problems to stdout
-- [ ] **CLI-04**: CLI is installable and runnable via `uvx` / `pipx`
+- [x] **CLI-04**: CLI is installable and runnable via `uvx` / `pipx`
 
 ### PWA
 
@@ -67,7 +67,7 @@ Requirements for the initial release. Each maps to roadmap phases.
 ### Distribution
 
 - [ ] **DIST-01**: Library is published to PyPI as `contaplus-reader` under LGPL-3.0-or-later
-- [ ] **DIST-02**: `uv build` produces a wheel usable for PyPI publish and for local dev (editable installs, `micropip` from a locally built wheel)
+- [x] **DIST-02**: `uv build` produces a wheel usable for PyPI publish and for local dev (editable installs, `micropip` from a locally built wheel)
 
 ### Testing
 
@@ -125,21 +125,21 @@ Which phases cover which requirements.
 | API-03 | Phase 3 | Pending |
 | API-04 | Phase 1 | Pending |
 | API-05 | Phase 2 | Pending |
-| XLSX-01 | Phase 1 | Pending |
+| XLSX-01 | Phase 1 | Complete |
 | XLSX-02 | Phase 3 | Pending |
 | XLSX-03 | Phase 3 | Pending |
-| XLSX-04 | Phase 1 | Pending |
-| CLI-01 | Phase 1 | Pending |
+| XLSX-04 | Phase 1 | Complete |
+| CLI-01 | Phase 1 | Complete |
 | CLI-02 | Phase 4 | Pending |
 | CLI-03 | Phase 4 | Pending |
-| CLI-04 | Phase 1 | Pending |
+| CLI-04 | Phase 1 | Complete |
 | PWA-01 | Phase 5 | Pending |
 | PWA-02 | Phase 5 | Pending |
 | PWA-03 | Phase 5 | Pending |
 | PWA-04 | Phase 5 | Pending |
 | PWA-05 | Phase 5 | Pending |
 | DIST-01 | Phase 4 | Pending |
-| DIST-02 | Phase 1 | Pending |
+| DIST-02 | Phase 1 | Complete |
 | TEST-01 | Phase 1 | Pending |
 | TEST-02 | Phase 1 | Pending |
 
