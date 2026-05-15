@@ -48,9 +48,22 @@ def main(
         )
         raise typer.Exit(1)
 
-    # Read and parse the input file (bytes-first API).
+    # Read the raw bytes from disk (guards against missing/unreadable files).
     try:
-        data = read(input_file.read_bytes(), source_name=str(input_file))
+        raw_bytes = input_file.read_bytes()
+    except OSError as exc:
+        console.print(
+            Panel(
+                str(exc),
+                title="File Read Error",
+                border_style="red",
+            )
+        )
+        raise typer.Exit(1) from None
+
+    # Parse the bytes (bytes-first API).
+    try:
+        data = read(raw_bytes, source_name=str(input_file))
     except ContaPlusReadError as exc:
         # D-17: Structured Rich panel -- no Python traceback.
         console.print(

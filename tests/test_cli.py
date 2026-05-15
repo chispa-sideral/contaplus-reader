@@ -152,6 +152,23 @@ def test_cli_missing_output_arg_exits_nonzero(cp850_basic_dbf: Path) -> None:
 
 
 # ---------------------------------------------------------------------------
+# CR-02: Non-existent input file exits 1 with no traceback
+# ---------------------------------------------------------------------------
+
+def test_cli_nonexistent_input_exits_nonzero(tmp_path: Path) -> None:
+    """CR-02: Invoking CLI with a non-existent input file exits 1 with no Python traceback."""
+    result = runner.invoke(app, [str(tmp_path / "no_such_file.dbf"), str(tmp_path / "out.xlsx")])
+    assert result.exit_code == 1
+    combined = result.output + (result.stderr or "")
+    assert "Traceback" not in combined
+    # typer.Exit(1) raises SystemExit(1) -- raw OSError/FileNotFoundError must NOT leak
+    if result.exception is not None:
+        assert isinstance(result.exception, SystemExit), (
+            f"Expected SystemExit (from typer.Exit), got raw exception: {result.exception!r}"
+        )
+
+
+# ---------------------------------------------------------------------------
 # --help output (Pitfall 6)
 # ---------------------------------------------------------------------------
 
