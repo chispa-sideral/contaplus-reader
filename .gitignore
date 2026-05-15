@@ -1,0 +1,32 @@
+# Confidential — real ContaPlus test data, internal only. NEVER commit.
+# Used locally for schema validation against real data. The committed test
+# suite uses synthetic, blob-free fixtures only.
+pii-test-data/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+*.egg
+.eggs/
+build/
+dist/
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+htmlcov/
+.coverage
+.coverage.*
+
+# Node / PWA
+node_modules/
+web/dist/
+web/.vite/
+
+# Editor / OS
+.DS_Store
+Thumbs.db
+.idea/
+*.swp
