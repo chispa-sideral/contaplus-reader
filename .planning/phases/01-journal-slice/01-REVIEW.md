@@ -1,6 +1,6 @@
 ---
 phase: 01-journal-slice
-reviewed: 2026-05-15T15:46:35Z
+reviewed: 2026-05-15T16:30:00Z
 depth: standard
 files_reviewed: 11
 files_reviewed_list:
@@ -16,421 +16,264 @@ files_reviewed_list:
   - tests/test_reader.py
   - tests/test_xlsx.py
 findings:
-  critical: 4
-  warning: 5
-  info: 3
+  critical: 1
+  warning: 6
+  info: 5
   total: 12
 status: issues_found
 ---
 
 # Phase 1: Code Review Report
 
-**Reviewed:** 2026-05-15T15:46:35Z
+**Reviewed:** 2026-05-15T16:30:00Z
 **Depth:** standard
 **Files Reviewed:** 11
 **Status:** issues_found
 
 ## Summary
 
-Reviewed the complete Phase 1 journal-slice implementation: library core (`_bridge.py`,
-`_reader.py`, `_sniffer.py`, `models.py`), public API (`__init__.py`), CLI (`cli.py`),
-XLSX renderer (`xlsx.py`), and the full test suite.
+This is a re-review of the Phase 1 journal slice after a prior round of fixes.
+The earlier blockers (non-seekable `BinaryIO` crash, CLI leaking `FileNotFoundError`,
+mutable-list `rows`, sign-blind D-C2) have been correctly addressed: the sniffer
+now uses `seekable()`, the CLI wraps `read_bytes()` in `try/except OSError`,
+`ContaPlusJournal.rows` is a `tuple`, and D-C2 uses `debe != 0 and haber != 0`.
+The journal-correctness path — the core value of this project per CLAUDE.md — is
+faithfully implemented and well-tested.
 
-The encoding policy (cp850 unconditionally), the journal business rules (D-C1 through
-D-E3), and the bytes-first API are correctly implemented. The temp-file bridge uses
-`delete=False` + `finally` unlink, which is the right Windows-safe pattern.
-
-Four blockers require immediate attention: a crash on non-seekable BinaryIO input
-(unhandled `OSError` from `seek(0)`), unhandled `FileNotFoundError` in the CLI leaking
-a raw Python traceback, a mutable `list` on a frozen dataclass breaking the D-07
-immutability contract for `ContaPlusJournal.rows`, and a D-C2 logic gap where a row
-with `(debe < 0, haber > 0)` bypasses the both-non-zero rejection. Five warnings
-cover: zero-value column width underestimation in XLSX, the missing `data.seekable()`
-check before seek, an unconstrained `data.read()` for streaming BinaryIO, a dead-code
-`if TYPE_CHECKING: pass` block, and the `ContaPlusReadError` freeze bypass via sentinel.
-
----
+This review found new and remaining defects in the current code. One BLOCKER: a
+write failure inside `bytes_to_tmppath` leaks the temp-file handle and, on
+Windows, the cleanup `unlink` raises `PermissionError`, masking the real
+exception — the exact Windows file-locking pitfall the module docstring claims
+to defend against, but only on the happy path. WARNINGs cover an unhandled
+`OSError` on the CLI output write (D-17 violation), a duplicated candidate-column
+list that can silently drift between `_assert_journal_shaped` and `_pick_column`,
+amount columns whose DBF type is never validated (asymmetric with the FECHA
+type check), a truthiness-based null check on amounts, an over-narrow exception
+catch in the reader, and an unguarded `Optional` dereference in the XLSX
+renderer.
 
 ## Critical Issues
 
-### CR-01: Non-seekable BinaryIO crashes with unhandled OSError instead of ContaPlusReadError
+### CR-01: Temp-file handle leak and masked exception on write failure in `bytes_to_tmppath`
 
-**File:** `src/contaplus_reader/_sniffer.py:47-48`
-
-**Issue:** `sniff()` checks `hasattr(data, "seek")` to decide whether to seek back after
-reading 1 byte. On CPython, all `io.RawIOBase` and `io.BufferedIOBase` subclasses define
-a `seek` method even when the underlying stream is non-seekable (e.g., stdin pipe,
-`socket.makefile()`). Calling `data.seek(0)` on a non-seekable stream raises
-`OSError: [Errno 29] Illegal seek`, which is not caught anywhere in the call chain and
-propagates as a raw Python traceback — violating D-17 and the contract that all errors
-surface as `ContaPlusReadError`.
-
-The correct check is `data.seekable()`, which returns `False` for pipes/sockets without
-raising. Additionally, even if `seek(0)` succeeds, if it silently no-ops (some custom
-IO implementations), `bytes_to_tmppath` then calls `data.read()` from offset 1, writing
-a truncated file to the temp path and producing a corrupted DBF parse.
+**File:** `src/contaplus_reader/_bridge.py:32-38`
+**Issue:** `tempfile.NamedTemporaryFile(delete=False)` is created, then
+`tmp.write(raw)` runs inside the `try`. If `tmp.write()` raises (disk full,
+quota exceeded, I/O error), control jumps straight to the `finally` block and
+`tmp.close()` on line 35 **never executes** — the file handle stays open. On
+Windows the `finally` then runs `Path(tmp.name).unlink(missing_ok=True)`, which
+raises `PermissionError` (WinError 32, "file in use by another process")
+because the handle is still open. That cleanup exception **replaces the original
+write exception**: the caller sees a misleading cleanup error, the real cause is
+lost, and the temp file is leaked on disk. The module docstring explicitly
+claims to handle the Windows file-locking pitfall, but the `close()` guard only
+covers the path where `write()` succeeds.
 
 **Fix:**
 ```python
-# _sniffer.py
-if hasattr(data, "seekable") and data.seekable():
-    data.seek(0)
-elif hasattr(data, "seek"):
+@contextmanager
+def bytes_to_tmppath(data: bytes | io.IOBase) -> Generator[Path, None, None]:
+    raw: bytes = data if isinstance(data, bytes) else data.read()
+    tmp = tempfile.NamedTemporaryFile(suffix=".dbf", delete=False)
+    tmp_name = tmp.name
     try:
-        data.seek(0)
-    except OSError:
-        raise ContaPlusReadError(
-            row_index=-1,
-            column=None,
-            message="Input stream is not seekable; provide bytes or a seekable BinaryIO",
-        )
+        try:
+            tmp.write(raw)
+        finally:
+            tmp.close()  # always close, even if write() raised
+        yield Path(tmp_name)
+    finally:
+        Path(tmp_name).unlink(missing_ok=True)
 ```
-
----
-
-### CR-02: CLI leaks raw FileNotFoundError traceback when input file does not exist
-
-**File:** `src/contaplus_reader/cli.py:53`
-
-**Issue:** `input_file.read_bytes()` raises `FileNotFoundError` (a subclass of `OSError`)
-when the input path does not exist. This exception is not caught by the surrounding
-`except ContaPlusReadError` block, so it propagates as a raw Python traceback to the
-terminal — directly violating D-17 ("ContaPlusReadError is shown as a Rich error panel
-with no traceback; exits 1").
-
-The same problem applies to `PermissionError` (e.g., file exists but is not readable).
-Both are common user errors that deserve a clean error message, not a traceback.
-
-**Fix:**
-```python
-# cli.py
-try:
-    raw_bytes = input_file.read_bytes()
-except OSError as exc:
-    console.print(
-        Panel(
-            str(exc),
-            title="File Read Error",
-            border_style="red",
-        )
-    )
-    raise typer.Exit(1) from None
-
-try:
-    data = read(raw_bytes, source_name=str(input_file))
-except ContaPlusReadError as exc:
-    ...
-```
-
----
-
-### CR-03: ContaPlusJournal.rows is a mutable list on a frozen dataclass — D-07 contract broken
-
-**File:** `src/contaplus_reader/models.py:119`
-
-**Issue:** `ContaPlusJournal` is declared `@dataclass(frozen=True)`, and D-07 states rows
-are "frozen, fully static-typed dataclasses." `frozen=True` prevents reassignment of
-`rows` itself (`journal.rows = []` raises `FrozenInstanceError`), but it does NOT prevent
-mutation of the list contents:
-
-```python
-journal.rows.append(bad_row)   # silently succeeds
-journal.rows.clear()           # silently succeeds
-journal.rows[0] = bad_row      # silently succeeds
-```
-
-`tax-workbench` and other consumers that rely on `journal.rows` being immutable after
-construction will be silently corrupted by any intermediate code that mutates the list.
-Since this library feeds tax filings, silent data mutation is the worst failure mode.
-
-**Fix:** Use a tuple for `rows`, or convert to tuple at construction time.
-
-```python
-# models.py
-@dataclass(frozen=True)
-class ContaPlusJournal:
-    rows: tuple[JournalRow, ...]   # immutable sequence
-    skipped_memo: int = 0
-    source_name: str | None = None
-```
-
-Then in `_reader.py`, change:
-```python
-return ContaPlusJournal(
-    rows=tuple(rows),   # was: rows=rows
-    skipped_memo=skipped_memo,
-    source_name=source_name,
-)
-```
-
-And update any test code that constructs `ContaPlusJournal(rows=[...])` to use `rows=(...)`.
-
----
-
-### CR-04: D-C2 check does not reject rows where one side is negative and the other is positive
-
-**File:** `src/contaplus_reader/_reader.py:157`
-
-**Issue:** The D-C2 rule is documented as "both-non-zero debe+haber -> ContaPlusReadError".
-The code implements:
-
-```python
-if debe > 0 and haber > 0:
-    raise ContaPlusReadError(...)
-```
-
-The comment says this is intentional ("uses > 0, NOT != 0 — Pitfall 2 — negatives must
-pass through per D-C1"). However, a row where `debe = -10.0` and `haber = 50.0` has BOTH
-values non-zero: both a debit and a credit are populated simultaneously. This is equally
-non-standard double-entry bookkeeping as the `(50, 50)` case. The current logic accepts
-`(-10, 50)` silently, producing a `JournalRow` where both `debe` and `haber` are
-non-zero, which no downstream consumer (including tax-workbench) is designed to handle.
-
-The correct reading of "negatives pass through per D-C1" is that a row like `(-10, 0)` or
-`(0, -50)` is a valid correction/reversal; a row with BOTH sides non-zero (regardless of
-sign) is always invalid. The D-C2 check should be sign-agnostic:
-
-**Fix:**
-```python
-# Both non-zero regardless of sign is invalid (D-C2).
-# D-C1 negatives: (-10, 0) or (0, -50) pass through; (-10, 50) is still both-non-zero.
-if debe != 0 and haber != 0:
-    raise ContaPlusReadError(
-        row_index=idx,
-        column=None,
-        message=f"both-non-zero row: debe={debe}, haber={haber}",
-    )
-```
-
-Note: this change requires the existing test `test_negative_debe_passes_through` to
-remain passing (it uses `eurodebe=-1.0, eurohaber=0.0` — one side is zero, so it still
-passes). A new test `test_negative_debe_positive_haber_raises` should be added.
-
----
+This guarantees the handle is closed before any `unlink`, so cleanup never masks
+the original write error and no handle leaks.
 
 ## Warnings
 
-### WR-01: sniff() does not handle non-seekable streams before bytes_to_tmppath reads them
+### WR-01: CLI output write has no error handling — a write failure leaks a raw traceback
 
-**File:** `src/contaplus_reader/_sniffer.py:46-48` / `src/contaplus_reader/__init__.py:56-57`
-
-**Issue:** Separate from the OSError crash (CR-01), there is a data integrity gap: even
-when `seek(0)` succeeds for a seekable stream, `sniff()` uses `hasattr(data, "seek")`
-rather than `data.seekable()`. Streams that are seekable will work. But the two-step
-protocol (`sniff(data)` then `bytes_to_tmppath(data)`) requires that the stream position
-is reset to 0 after `sniff` reads 1 byte. If the `seek(0)` call in `sniff` is skipped or
-fails silently, `bytes_to_tmppath` reads from offset 1 onward, producing a DBF missing
-its first byte (its version byte) — which will then be misread or fail to parse, and the
-error message will be confusing.
-
-**Fix:** Use `data.seekable()` as the canonical check (see CR-01 fix). Add an assertion
-or test that verifies `bytes_to_tmppath` receives the full stream.
-
----
-
-### WR-02: xlsx.py column autofit uses `c.value or ""` which treats 0.0 as empty
-
-**File:** `src/contaplus_reader/xlsx.py:74`
-
-**Issue:** The column-width calculation is:
-
+**File:** `src/contaplus_reader/cli.py:82`
+**Issue:** The CLI carefully wraps `input_file.read_bytes()` in `try/except OSError`
+that prints a clean Rich panel and exits 1 (lines 52-62). But the symmetric
+`output_file.write_bytes(xlsx_bytes)` on line 82 has **no error handling**. If
+the output directory is not writable, the disk is full, or the path is invalid,
+this raises a raw `OSError` that escapes `main()` and the user sees a full Python
+traceback — directly contradicting D-17's "no traceback" contract for user-facing
+errors. The overwrite guard at line 45 only checks `exists()`, not writability.
+**Fix:** Wrap the write in the same pattern used for the read:
 ```python
-max_len = max((len(str(c.value or "")) for c in col_cells), default=0)
+try:
+    output_file.write_bytes(xlsx_bytes)
+except OSError as exc:
+    console.print(Panel(str(exc), title="File Write Error", border_style="red"))
+    raise typer.Exit(1) from None
 ```
 
-`0.0 or ""` evaluates to `""` (because `0.0` is falsy in Python), so any cell holding
-the value `0.0` contributes `0` to the width calculation instead of `len("0.00") = 4`.
-In a journal where many rows have `haber=0.0` (debit-only rows), the Haber column width
-is calculated from the concepto header length only, and numeric cells may be truncated
-in Excel's display (showing `######`).
+### WR-02: Candidate column lists are duplicated and can silently drift
 
-**Fix:**
+**File:** `src/contaplus_reader/_reader.py:31-32` and `84-85`
+**Issue:** The debe/haber candidate sets are declared **twice**: as module-level
+tuples `_DEBE_COL_CANDIDATES` / `_HABER_COL_CANDIDATES` (lines 31-32), and again
+as local literal sets `_DEBE` / `_HABER` inside `_assert_journal_shaped`
+(lines 84-85). They currently match, but nothing enforces it. If a maintainer
+adds a candidate (e.g. a third euro-era variant) to the module tuples, the shape
+check at line 86 still runs against the stale local sets — so
+`_assert_journal_shaped` and `_pick_column` can disagree: a DBF could pass the
+shape check yet fail in `_pick_column` with the exact confusing "no debe column"
+error the shape check exists to prevent (per the function's own docstring,
+lines 60-64).
+**Fix:** Derive from the single source of truth and delete the local literals:
 ```python
-max_len = max(
-    (len(str("" if c.value is None else c.value)) for c in col_cells),
-    default=0,
-)
+if not (field_set & set(_DEBE_COL_CANDIDATES)) or not (
+    field_set & set(_HABER_COL_CANDIDATES)
+):
 ```
 
-Or more explicitly:
-```python
-def _cell_display_len(v: object) -> int:
-    return 0 if v is None else len(str(v))
+### WR-03: `_assert_journal_shaped` does not verify the debe/haber columns are numeric
 
-max_len = max((_cell_display_len(c.value) for c in col_cells), default=0)
+**File:** `src/contaplus_reader/_reader.py:59-95`
+**Issue:** The shape check verifies FECHA exists *and has DBF type `D`* (line 72),
+but for the debit/credit columns it only checks the **field name** is present
+(line 86) — never the field type. A DBF with a character-typed field literally
+named `DEBE` (`C(20)`) passes `_assert_journal_shaped`, `_pick_column` selects
+it, then `float(record.get(debe_col) or 0)` raises `ValueError` on a non-numeric
+string. That `ValueError` is caught at line 226 and surfaced as a generic
+`"DBF read error: ..."` — exactly the confusing late failure the shape check
+exists to prevent. The asymmetry (FECHA type-checked, amounts not) is a real
+correctness gap for malformed inputs.
+**Fix:** In `_assert_journal_shaped`, also assert the resolved debe/haber field
+has a numeric type:
+```python
+numeric_types = {"N", "F"}
+for kind, cands in (("debit", _DEBE_COL_CANDIDATES), ("credit", _HABER_COL_CANDIDATES)):
+    matched = [c for c in cands if c in field_set]
+    if not matched:
+        raise ContaPlusReadError(row_index=-1, column=None,
+            message=f"... no {kind} columns ...")
+    if field_type_map.get(matched[0]) not in numeric_types:
+        raise ContaPlusReadError(row_index=-1, column=None,
+            message=f"{kind} column {matched[0]!r} is not numeric")
 ```
 
----
+### WR-04: Amount null check relies on truthiness, treating any falsy value as missing
 
-### WR-03: bytes_to_tmppath reads BinaryIO into memory without size limit
-
-**File:** `src/contaplus_reader/_bridge.py:31`
-
-**Issue:** `raw: bytes = data if isinstance(data, bytes) else data.read()` calls
-`data.read()` with no size limit. For an untrusted or malformed BinaryIO that does not
-terminate (e.g., a network socket in file mode, or a generator-backed IO), this hangs
-indefinitely. For a very large stream it exhausts available memory. There is no
-`ContaPlusReadError` raised — the process either hangs or is killed by the OS.
-
-While the project description targets desktop/local use and the bytes path already
-requires the caller to hold the full bytes in memory, a safeguard prevents the library
-from becoming a denial-of-service vector when consumed via the future PWA worker bridge
-(where `BinaryIO` might wrap a network stream).
-
-**Fix:** Apply a size cap when reading from BinaryIO:
-
+**File:** `src/contaplus_reader/_reader.py:152-153`
+**Issue:** FECHA is checked explicitly with `is None` (lines 143-149), but amounts
+use `float(record.get(debe_col) or 0)`. The `or` idiom treats **every falsy
+value** as missing, not just `None`. For a journal debit/credit a `None` value
+means the DBF field is absent or null — arguably as broken as a null FECHA — yet
+here it is silently coerced to `0`, which then makes the row look like a both-zero
+memo line (D-C3) and gets skipped instead of raising. The inconsistency (FECHA
+explicit, amounts implicit) also obscures intent. It happens not to corrupt data
+today only because a real `0` amount and the fallback `0` coincide.
+**Fix:** Make the null handling explicit and deliberate per field:
 ```python
-_MAX_DBF_BYTES = 256 * 1024 * 1024  # 256 MB — well above any realistic journal
-
-raw: bytes
-if isinstance(data, bytes):
-    raw = data
-else:
-    raw = data.read(_MAX_DBF_BYTES + 1)
-    if len(raw) > _MAX_DBF_BYTES:
-        raise ContaPlusReadError(
-            row_index=-1,
-            column=None,
-            message=f"Input exceeds maximum supported size ({_MAX_DBF_BYTES // 1024 // 1024} MB)",
-        )
+debe_raw = record.get(debe_col)
+haber_raw = record.get(haber_col)
+# Decide: is a null amount a broken row, or a legitimate zero?
+debe = float(debe_raw) if debe_raw is not None else 0.0
+haber = float(haber_raw) if haber_raw is not None else 0.0
 ```
+If a null amount should be rejected, raise `ContaPlusReadError(column=debe_col)`
+as is done for FECHA.
 
----
+### WR-05: Reader catches only `(struct.error, ValueError, OSError)` — other dbfread errors escape as raw tracebacks
 
-### WR-04: ContaPlusReadError freeze can be bypassed by setting the init sentinel
-
-**File:** `src/contaplus_reader/models.py:70-78`
-
-**Issue:** The sentinel flag name `_contaplus_init_` is stored as a module-level constant
-`_INIT_SENTINEL` and exposed via the instance `__dict__`. Any code can bypass the
-freeze protection by setting this sentinel directly:
-
+**File:** `src/contaplus_reader/_reader.py:226`
+**Issue:** The outer fallback `except` catches `(struct.error, ValueError, OSError)`.
+`dbfread`'s record iteration and field parsing can raise other exception types on
+corrupted input — `KeyError`, `IndexError`, `AttributeError`, or `TypeError` from
+internal field-parser code paths on a malformed header or unexpected field
+descriptor. None of these are caught, so they propagate as a raw Python traceback,
+violating the project contract that all reader failures surface as
+`ContaPlusReadError` (D-04: "read() always raises ContaPlusReadError on invalid
+data").
+**Fix:** Add a final `Exception` fallback that re-wraps, while keeping the
+specific handlers for clearer messages:
 ```python
-exc = ContaPlusReadError(message="original")
-object.__setattr__(exc, "_contaplus_init_", True)
-exc.message = "tampered"   # succeeds, no FrozenInstanceError
-object.__delattr__(exc, "_contaplus_init_")
-```
-
-For a library producing tax-filing data, silent mutation of error objects (which carry
-`row_index` and `column` that determine which data is accepted or rejected) is a
-correctness risk. A consuming module that receives a `ContaPlusReadError` and "corrects"
-the `row_index` to hide a real data error would be undetectable.
-
-**Fix:** Use a private name that is harder to guess, or use `object.__setattr__` guarded
-by a check against the class's `__dataclass_fields__` keys — setting any declared field
-outside of `__init__` raises unconditionally, without relying on a sentinel in
-`__dict__`:
-
-```python
-def __setattr__(self, name: str, value: object) -> None:
-    if name in _EXCEPTION_INTERNAL_ATTRS:
-        object.__setattr__(self, name, value)
-        return
-    # Only allow writes to declared fields during dataclass __init__,
-    # detected by whether the instance has any declared fields yet.
-    if not any(
-        k in self.__dict__
-        for k in _dataclasses.fields(self.__class__)
-        if k not in _EXCEPTION_INTERNAL_ATTRS
-    ):
-        object.__setattr__(self, name, value)
-        return
-    raise _dataclasses.FrozenInstanceError("cannot assign to field " + repr(name))
-```
-
-Alternatively, accept this as a known limitation of the custom approach and document it.
-
----
-
-### WR-05: _reader.py does not catch all exceptions that dbfread can raise during iteration
-
-**File:** `src/contaplus_reader/_reader.py:226-232`
-
-**Issue:** The outer `except` block catches `(struct.error, ValueError, OSError)`. During
-record iteration, `dbfread`'s `FieldParser` can raise `UnicodeDecodeError` (already
-caught at line 219), but the `_decode_text` method in dbfread also uses the configured
-encoding, and an unexpected field type or corrupted field data could raise
-`AttributeError` or `TypeError` from the internal `field_parser`. These are not in the
-caught set and would propagate as unhandled exceptions — producing a raw traceback
-instead of a `ContaPlusReadError`.
-
-**Fix:** Extend the catch clause to cover `Exception` as a final fallback, re-wrapping
-as `ContaPlusReadError`:
-
-```python
-except (ContaPlusReadError, UnicodeDecodeError):
+except ContaPlusReadError:
     raise
-except Exception as exc:
+except UnicodeDecodeError as exc:
+    raise ContaPlusReadError(..., original=exc) from exc
+except Exception as exc:  # struct.error, ValueError, OSError, and anything else
     raise ContaPlusReadError(
-        row_index=-1,
-        column=None,
-        message=f"Unexpected DBF read error: {type(exc).__name__}: {exc}",
+        row_index=-1, column=None,
+        message=f"DBF read error: {type(exc).__name__}: {exc}",
         original=exc,
     ) from exc
 ```
 
----
+### WR-06: XLSX renderer dereferences `wb.active` (`Worksheet | None`) without a guard
+
+**File:** `src/contaplus_reader/xlsx.py:50-51`
+**Issue:** `ws = wb.active` is typed `Worksheet | None` by openpyxl; the next line
+does `ws.title = "Diario"` and all subsequent code dereferences `ws` with no
+guard. For a fresh `Workbook()` `wb.active` is never `None` in practice so this
+does not crash today, but it silently dereferences an `Optional`, which a strict
+type checker (the project mandates strict typing — CLAUDE.md "Type safety") will
+flag, and it leaves the invariant undocumented.
+**Fix:** Add an explicit assertion that documents the invariant and satisfies the
+type checker:
+```python
+ws = wb.active
+assert ws is not None  # a fresh Workbook always has an active sheet
+ws.title = "Diario"
+```
 
 ## Info
 
-### IN-01: Dead code — empty `if TYPE_CHECKING: pass` block in `__init__.py`
+### IN-01: Unused import and dead `TYPE_CHECKING` block in `__init__.py`
 
-**File:** `src/contaplus_reader/__init__.py:27-28`
+**File:** `src/contaplus_reader/__init__.py:14`, `27-28`
+**Issue:** `import io` (line 14) is unused — nothing in `__init__.py` references
+`io`. The `if TYPE_CHECKING: pass` block (lines 27-28) imports nothing and is
+dead code; `TYPE_CHECKING` is imported only to gate an empty `pass`.
+**Fix:** Delete `import io`, delete the `if TYPE_CHECKING: pass` block, and drop
+`TYPE_CHECKING` from the `typing` import on line 15.
 
-**Issue:** The `if TYPE_CHECKING: pass` block imports nothing and serves no purpose. It
-was likely left over from a scaffolding step.
+### IN-02: `ContaPlusReadError.__init_subclass__` override is a pure no-op
 
-**Fix:** Remove lines 27-28 entirely, and remove the `TYPE_CHECKING` import from line 15.
+**File:** `src/contaplus_reader/models.py:57-58`
+**Issue:** The `__init_subclass__` override only calls
+`super().__init_subclass__(**kwargs)` and does nothing else — it is
+indistinguishable from not defining it at all, and forces future readers to
+inspect it to confirm it is inert.
+**Fix:** Delete the `__init_subclass__` override unless a concrete reason to
+intercept subclassing is documented.
 
----
+### IN-03: `_pick_column` sets `column=kind` where `kind` is a category label, not a field name
 
-### IN-02: `diario_dbf_builder` fixture uses mutable dict workaround instead of nonlocal
+**File:** `src/contaplus_reader/_reader.py:49-56`
+**Issue:** On failure `_pick_column` raises `ContaPlusReadError(column=kind, ...)`
+with `kind` being `"debe"` / `"haber"`. `models.py:48` documents `column` as
+"field name or None when not row-specific". `"debe"` is a candidate *category*,
+not necessarily a real DBF field name, and this is a file-level error
+(`row_index=-1`). `_assert_journal_shaped` uses `column=None` for the same class
+of file-shape error — the two are inconsistent.
+**Fix:** Use `column=None` in the `_pick_column` error to match
+`_assert_journal_shaped`, or document `column` as also accepting a category label.
 
-**File:** `tests/conftest.py:164-170`
+### IN-04: Local `_DEBE` / `_HABER` use module-constant naming inside a function
 
-**Issue:** The `counter = {"n": 0}` / `counter["n"] += 1` pattern is a Python 2
-workaround for the absence of `nonlocal`. The project targets Python >=3.13 where
-`nonlocal` is standard. This is misleading to future contributors.
+**File:** `src/contaplus_reader/_reader.py:84-85`
+**Issue:** The local variables `_DEBE` and `_HABER` use leading-underscore
+"module-private constant" naming inside a function body, reading as if they were
+module-level constants. Combined with WR-02 (duplication) this is a readability
+trap.
+**Fix:** Resolved naturally if WR-02 is applied (the locals are deleted).
+Otherwise rename to plain locals such as `debit_names` / `credit_names`.
 
-**Fix:**
-```python
-def diario_dbf_builder(...):
-    counter = 0
+### IN-05: `Generator` imported from `typing` instead of `collections.abc`
 
-    def _build(rows):
-        nonlocal counter
-        counter += 1
-        target_dir = tmp_path_factory.mktemp(f"custom_{counter}")
-        ...
-
-    return _build
-```
-
----
-
-### IN-03: test_cli.py does not test that a missing input file produces a clean error
-
-**File:** `tests/test_cli.py` (missing test)
-
-**Issue:** The CLI has no guard around `input_file.read_bytes()` (see CR-02). There is no
-test that invokes the CLI with a path to a non-existent file and asserts that the exit
-code is 1 and no traceback appears in output. Without this test, CR-02 will not be caught
-by the test suite.
-
-**Fix:** Add a test:
-```python
-def test_cli_nonexistent_input_exits_nonzero(tmp_path: Path) -> None:
-    """CLI must exit non-zero cleanly when the input file does not exist."""
-    out = tmp_path / "out.xlsx"
-    result = runner.invoke(app, [str(tmp_path / "no_such_file.dbf"), str(out)])
-    assert result.exit_code != 0
-    combined = result.output + (result.stderr or "")
-    assert "Traceback" not in combined
-```
+**File:** `src/contaplus_reader/_bridge.py:13`
+**Issue:** `from typing import Generator` is deprecated since Python 3.9. On
+Python 3.13 (this project's minimum) the canonical import is
+`from collections.abc import Generator`. `typing.Generator` still works but
+triggers deprecation signals in strict tooling.
+**Fix:** `from collections.abc import Generator`.
 
 ---
 
-_Reviewed: 2026-05-15T15:46:35Z_
+_Reviewed: 2026-05-15T16:30:00Z_
 _Reviewer: Claude (gsd-code-reviewer)_
 _Depth: standard_
