@@ -104,53 +104,53 @@ Explicitly excluded. Documented to prevent scope creep.
 
 ## Traceability
 
-Which phases cover which requirements. **Populated during roadmap creation.**
+Which phases cover which requirements.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| INPUT-01 | TBD | Pending |
-| INPUT-02 | TBD | Pending |
-| INPUT-03 | TBD | Pending |
-| INPUT-04 | TBD | Pending |
-| INPUT-05 | TBD | Pending |
-| INPUT-06 | TBD | Pending |
-| JRNL-01 | TBD | Pending |
-| JRNL-02 | TBD | Pending |
-| JRNL-03 | TBD | Pending |
-| TABL-01 | TBD | Pending |
-| TABL-02 | TBD | Pending |
-| TABL-03 | TBD | Pending |
-| TABL-04 | TBD | Pending |
-| BAL-01 | TBD | Pending |
-| BAL-02 | TBD | Pending |
-| API-01 | TBD | Pending |
-| API-02 | TBD | Pending |
-| API-03 | TBD | Pending |
-| API-04 | TBD | Pending |
-| API-05 | TBD | Pending |
-| XLSX-01 | TBD | Pending |
-| XLSX-02 | TBD | Pending |
-| XLSX-03 | TBD | Pending |
-| XLSX-04 | TBD | Pending |
-| CLI-01 | TBD | Pending |
-| CLI-02 | TBD | Pending |
-| CLI-03 | TBD | Pending |
-| CLI-04 | TBD | Pending |
-| PWA-01 | TBD | Pending |
-| PWA-02 | TBD | Pending |
-| PWA-03 | TBD | Pending |
-| PWA-04 | TBD | Pending |
-| PWA-05 | TBD | Pending |
-| DIST-01 | TBD | Pending |
-| DIST-02 | TBD | Pending |
-| TEST-01 | TBD | Pending |
-| TEST-02 | TBD | Pending |
+| INPUT-01 | Phase 1 | Pending |
+| INPUT-02 | Phase 2 | Pending |
+| INPUT-03 | Phase 1 | Pending |
+| INPUT-04 | Phase 2 | Pending |
+| INPUT-05 | Phase 2 | Pending |
+| INPUT-06 | Phase 2 | Pending |
+| JRNL-01 | Phase 1 | Pending |
+| JRNL-02 | Phase 1 | Pending |
+| JRNL-03 | Phase 1 | Pending |
+| TABL-01 | Phase 2 | Pending |
+| TABL-02 | Phase 2 | Pending |
+| TABL-03 | Phase 3 | Pending |
+| TABL-04 | Phase 3 | Pending |
+| BAL-01 | Phase 3 | Pending |
+| BAL-02 | Phase 3 | Pending |
+| API-01 | Phase 1 | Pending |
+| API-02 | Phase 1 | Pending |
+| API-03 | Phase 3 | Pending |
+| API-04 | Phase 1 | Pending |
+| API-05 | Phase 2 | Pending |
+| XLSX-01 | Phase 1 | Pending |
+| XLSX-02 | Phase 3 | Pending |
+| XLSX-03 | Phase 3 | Pending |
+| XLSX-04 | Phase 1 | Pending |
+| CLI-01 | Phase 1 | Pending |
+| CLI-02 | Phase 4 | Pending |
+| CLI-03 | Phase 4 | Pending |
+| CLI-04 | Phase 1 | Pending |
+| PWA-01 | Phase 5 | Pending |
+| PWA-02 | Phase 5 | Pending |
+| PWA-03 | Phase 5 | Pending |
+| PWA-04 | Phase 5 | Pending |
+| PWA-05 | Phase 5 | Pending |
+| DIST-01 | Phase 4 | Pending |
+| DIST-02 | Phase 1 | Pending |
+| TEST-01 | Phase 1 | Pending |
+| TEST-02 | Phase 1 | Pending |
 
 **Coverage:**
 - v1 requirements: 37 total
-- Mapped to phases: 0 (roadmap pending)
-- Unmapped: 37 ⚠️
+- Mapped to phases: 37
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-05-15*
-*Last updated: 2026-05-15 after initial definition*
+*Last updated: 2026-05-15 after roadmap creation*
