@@ -11,7 +11,7 @@ Requirements for the initial release. Each maps to roadmap phases.
 
 - [ ] **INPUT-01**: Reader accepts a raw `.dbf` file as bytes or a file-like object (no filesystem path required)
 - [ ] **INPUT-02**: Reader accepts a ContaPlus backup `.zip` as bytes or a file-like object
-- [ ] **INPUT-03**: Reader sniffs the input type and rejects unsupported inputs with a structured error
+- [x] **INPUT-03**: Reader sniffs the input type and rejects unsupported inputs with a structured error
 - [ ] **INPUT-04**: ZIP extraction works from an in-memory buffer and is zip-slip-safe (rejects path-traversal entries)
 - [ ] **INPUT-05**: Reader recursively locates ContaPlus tables inside a backup ZIP regardless of nesting depth
 - [ ] **INPUT-06**: Multi-company ZIP is disambiguated by a caller-supplied company selector; ambiguous or missing selection fails listing the available company names
@@ -20,7 +20,7 @@ Requirements for the initial release. Each maps to roadmap phases.
 
 - [ ] **JRNL-01**: Reader extracts validated journal rows (`fecha, cuenta, subcuenta, debe, haber, concepto`), porting the existing `tw-contaplus` business rules (D-A1…D-E3) including `cuenta = subcuenta[:4]`
 - [ ] **JRNL-02**: Journal reader handles ContaPlus format quirks — cp850 decoding, trailing-whitespace stripping, deleted records, both-zero memo lines (with a surfaced skipped count), negative amounts (sign preserved), and case-insensitive debit/credit column-name variants
-- [ ] **JRNL-03**: Journal reader rejects invalid rows (null `FECHA`, both-non-zero amounts, malformed `subcuenta`) with a structured per-row error carrying row and column context
+- [x] **JRNL-03**: Journal reader rejects invalid rows (null `FECHA`, both-non-zero amounts, malformed `subcuenta`) with a structured per-row error carrying row and column context
 
 ### Other Table Readers
 
@@ -37,7 +37,7 @@ Requirements for the initial release. Each maps to roadmap phases.
 ### Read API & Result Model
 
 - [ ] **API-01**: Library exposes a single bytes-first read API used by all consumers (CLI, PWA, tax-workbench)
-- [ ] **API-02**: Strict read path fails loudly on invalid data, raising `ContaPlusReadError` with row/column/context
+- [x] **API-02**: Strict read path fails loudly on invalid data, raising `ContaPlusReadError` with row/column/context
 - [ ] **API-03**: Lenient conversion path extracts all readable data, collects problems into a report, and never aborts the whole file
 - [ ] **API-04**: Library returns self-contained result types (`ContaPlusJournal` and per-table siblings) with no `tw-domain` dependency
 - [ ] **API-05**: Journal result is enriched with account/subaccount names when `SUBCTA.DBF` is present in the input
@@ -107,13 +107,13 @@ Which phases cover which requirements.
 |-------------|-------|--------|
 | INPUT-01 | Phase 1 | Pending |
 | INPUT-02 | Phase 2 | Pending |
-| INPUT-03 | Phase 1 | Pending |
+| INPUT-03 | Phase 1 | Complete |
 | INPUT-04 | Phase 2 | Pending |
 | INPUT-05 | Phase 2 | Pending |
 | INPUT-06 | Phase 2 | Pending |
 | JRNL-01 | Phase 1 | Pending |
 | JRNL-02 | Phase 1 | Pending |
-| JRNL-03 | Phase 1 | Pending |
+| JRNL-03 | Phase 1 | Complete |
 | TABL-01 | Phase 2 | Pending |
 | TABL-02 | Phase 2 | Pending |
 | TABL-03 | Phase 3 | Pending |
@@ -121,7 +121,7 @@ Which phases cover which requirements.
 | BAL-01 | Phase 3 | Pending |
 | BAL-02 | Phase 3 | Pending |
 | API-01 | Phase 1 | Pending |
-| API-02 | Phase 1 | Pending |
+| API-02 | Phase 1 | Complete |
 | API-03 | Phase 3 | Pending |
 | API-04 | Phase 1 | Pending |
 | API-05 | Phase 2 | Pending |

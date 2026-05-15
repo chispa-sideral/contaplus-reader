@@ -103,7 +103,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Journal Slice | 3/3 | Complete   | 2026-05-15 |
+| 1. Journal Slice | 4/4 | Complete   | 2026-05-15 |
 | 2. ZIP & Subaccounts | 0/TBD | Not started | - |
 | 3. Full Tables, Balance & Lenient Path | 0/TBD | Not started | - |
 | 4. Full CLI & PyPI Publication | 0/TBD | Not started | - |
