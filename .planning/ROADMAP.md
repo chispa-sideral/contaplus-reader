@@ -39,7 +39,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 
 Plans:
 - [x] 01-01-PLAN.md — Package scaffold, journal reader, models, bridge, sniffer, fixture factory, ~27 reader tests (completed 2026-05-15)
-- [ ] 01-02-PLAN.md — XLSX renderer (Spanish headers, accounting format), Typer CLI, XLSX tests, CLI tests
+- [x] 01-02-PLAN.md — XLSX renderer (Spanish headers, accounting format), Typer CLI, XLSX tests, CLI tests
 - [ ] 01-03-PLAN.md — README, .gitignore, uv build wheel, uvx smoke test (human checkpoint)
 
 ### Phase 2: ZIP & Subaccounts
@@ -98,7 +98,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Journal Slice | 1/3 | In progress | - |
+| 1. Journal Slice | 2/3 | In Progress|  |
 | 2. ZIP & Subaccounts | 0/TBD | Not started | - |
 | 3. Full Tables, Balance & Lenient Path | 0/TBD | Not started | - |
 | 4. Full CLI & PyPI Publication | 0/TBD | Not started | - |
