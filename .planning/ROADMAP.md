@@ -38,8 +38,13 @@ Decimal phases appear between their surrounding integers in numeric order.
 **Plans**: 3 plans
 
 Plans:
+**Wave 1**
 - [x] 01-01-PLAN.md — Package scaffold, journal reader, models, bridge, sniffer, fixture factory, ~27 reader tests (completed 2026-05-15)
+
+**Wave 2** *(blocked on Wave 1 completion)*
 - [x] 01-02-PLAN.md — XLSX renderer (Spanish headers, accounting format), Typer CLI, XLSX tests, CLI tests
+
+**Wave 3** *(blocked on Wave 2 completion)*
 - [x] 01-03-PLAN.md — README, .gitignore, uv build wheel, uvx smoke test (human checkpoint)
 
 ### Phase 2: ZIP & Subaccounts
