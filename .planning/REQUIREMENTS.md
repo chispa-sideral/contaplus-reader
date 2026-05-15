@@ -84,11 +84,6 @@ Deferred to a future release. Tracked but not in the current roadmap.
 - **VAL-01**: Two-pass "collect every bad row" validation in the strict API (v1 is first-fail)
 - **SUB-01**: Support for alpha-prefixed subaccount codes (e.g. `A4300001`)
 
-### PWA
-
-- **PWA-V2-01**: In-browser multi-company picker UI (v1 surfaces the multi-company error listing companies)
-- **PWA-V2-02**: In-page preview table of parsed rows before download
-
 ## Out of Scope
 
 Explicitly excluded. Documented to prevent scope creep.
@@ -101,6 +96,8 @@ Explicitly excluded. Documented to prevent scope creep.
 | FacturaPlus article tables (`articulo.dbf`, …) | Different product; not part of ContaPlus accounting data |
 | Sage 50 CSV export | Different format and product; v1 is ContaPlus DBF only |
 | Committing real ContaPlus data as test fixtures | Confidential; the suite uses synthetic blob-free fixtures (`pii-test-data/` is git-ignored) |
+| In-browser multi-company picker UI | Beyond the four-widget PWA; a separate project (per `/gsd:explore`) |
+| In-page preview table of parsed rows | Beyond the four-widget PWA; a separate project (per `/gsd:explore`) |
 
 ## Traceability
 
@@ -153,4 +150,4 @@ Which phases cover which requirements.
 
 ---
 *Requirements defined: 2026-05-15*
-*Last updated: 2026-05-15 after roadmap creation*
+*Last updated: 2026-05-15 after PWA-stack exploration*

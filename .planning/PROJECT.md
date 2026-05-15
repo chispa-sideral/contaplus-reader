@@ -84,10 +84,15 @@ else (CLI, PWA, styling) is delivery; correct extraction cannot fail.
   ContaPlus data." The SEED documents `DIARIO.DBF` deeply, `SUBCTA.DBF` and
   `BALAN.DBF` only partially, and other tables (`grupos.dbf`, `usuarios.dbf`, …)
   not at all — so research must enumerate and spec the non-journal tables.
-- The PWA runtime (Pyodide vs PyScript vs other) is undecided; `dbfread`,
-  `pandas`, and `openpyxl` are all available in-browser. Open research questions
-  in `SEED.md` cover cold-load UX, `micropip` resolution, service-worker caching,
-  in-browser XLSX writing, and zip-slip-safe extraction from an in-memory buffer.
+- The PWA runtime is **Pyodide** (real CPython in WASM) — confirmed via a
+  `/gsd:explore` session. It is the only runtime that runs the exact same library
+  as the CLI; lighter transpilers (e.g. Brython) cannot run `pandas` or the
+  library and would force a second browser-only reimplementation. The PWA UI is a
+  lean vanilla setup (HTML + a little JS/TS) — no React/shadcn/Tailwind. The
+  `SEED.md` open research questions still apply to the Phase 5 spike: cold-load
+  UX, `micropip` resolution, service-worker caching, in-browser XLSX writing, and
+  zip-slip-safe extraction from an in-memory buffer. See
+  `.planning/notes/pwa-lean-stack.md`.
 - Confidential real-world test data: the user has placed real ContaPlus backup
   archives (5 `.zip` files — 4 single-company, 1 multi-company) in
   `pii-test-data/`. This directory is git-ignored and internal-only — its
@@ -120,7 +125,8 @@ else (CLI, PWA, styling) is delivery; correct extraction cannot fail.
 | Strict typed API + lenient conversion path | tax-workbench needs fail-loud journal validation; migration users need extract-what-you-can | — Pending |
 | Journal enriched with `SUBCTA.DBF` names when available | Account codes alone aren't human-readable; additive, so tax-workbench's wrapper is unaffected | — Pending |
 | Shared, templated XLSX renderer for CLI and PWA | One renderer / template = consistent, nicely-styled output across both consumers | — Pending |
-| PWA runtime (Pyodide vs PyScript) deferred to research | Cold-load UX and `micropip` resolution must be validated before committing | — Pending |
+| PWA runtime: Pyodide (real CPython in WASM) | Only runtime that runs the exact same library as the CLI; lighter transpilers (Brython) can't run `pandas` or the library — would force a second reimplementation | — Pending |
+| PWA UI is lean vanilla — no React/shadcn/Tailwind | The UI is four static widgets and will not grow; a component framework + build pipeline has no payload | — Pending |
 | Real ContaPlus backups kept in git-ignored `pii-test-data/` | Confidential client data — never committed; local-only schema validation gate. Committed tests use synthetic blob-free fixtures | — Pending |
 
 ## Evolution
@@ -141,4 +147,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-05-15 after initialization*
+*Last updated: 2026-05-15 after PWA-stack exploration*
