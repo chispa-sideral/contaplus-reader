@@ -19,6 +19,7 @@ venv/
 htmlcov/
 .coverage
 .coverage.*
+*.whl
 
 # Node / PWA
 node_modules/
@@ -30,3 +31,7 @@ web/.vite/
 Thumbs.db
 .idea/
 *.swp
+
+# Env and temp
+.env
+*.tmp

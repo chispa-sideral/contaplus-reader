@@ -1,12 +1,34 @@
 # contaplus-reader
 
-Read Sage ContaPlus accounting exports (`DIARIO.DBF`, `.zip`) into usable formats.
+Read Sage ContaPlus accounting exports (DIARIO.DBF, .zip) into usable formats.
 
-## Features
+## Installation
 
-- Bytes-first API: `read(data: bytes | BinaryIO)` — no filesystem path required
-- Strict validated journal extraction with structured errors (`ContaPlusReadError`)
-- CLI: `contaplus2xlsx DIARIO.DBF out.xlsx`
+Recommended — run the CLI without installing anything:
+
+```
+uvx contaplus2xlsx
+```
+
+Install as a library:
+
+```
+pip install contaplus-reader
+```
+
+## Usage
+
+Convert a ContaPlus journal export to a styled Excel file:
+
+```
+contaplus2xlsx DIARIO.DBF out.xlsx
+```
+
+Use `--force` (or `--overwrite`) to overwrite an existing output file:
+
+```
+contaplus2xlsx DIARIO.DBF out.xlsx --force
+```
 
 ## License
 
