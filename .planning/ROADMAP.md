@@ -17,7 +17,7 @@ wheel). Every phase delivers something a user can run and verify end-to-end.
 Decimal phases appear between their surrounding integers in numeric order.
 
 - [x] **Phase 1: Journal Slice** - Thin working vertical: bytes → DIARIO.DBF reader → XLSX → CLI (completed 2026-05-15)
-- [ ] **Phase 2: ZIP & Subaccounts** - ZIP input, SUBCTA reader, journal name enrichment, group-level tables
+- [x] **Phase 2: ZIP & Subaccounts** - ZIP input, SUBCTA reader, journal name enrichment, group-level tables (completed 2026-05-16)
 - [ ] **Phase 3: Full Tables, Balance & Lenient Path** - Operational-table readers, trial-balance computation, lenient conversion path, XLSX report sheet
 - [ ] **Phase 4: Full CLI & PyPI Publication** - Multi-company flag, stdout reporting, wheel published to PyPI
 - [ ] **Phase 5: Browser PWA** - Pyodide spike then full client-side PWA on Cloudflare Pages
@@ -67,7 +67,7 @@ Plans:
 - [x] 02-02-PLAN.md — ZIP reader (_zip.py, _subcta.py), model extensions, sniffer upgrade, __init__ dispatch, journal enrichment
 
 **Wave 3** *(blocked on Wave 2 completion)*
-- [ ] 02-03-PLAN.md — Multi-sheet XLSX renderer (render()), --company CLI flag, human verification checkpoint
+- [x] 02-03-PLAN.md — Multi-sheet XLSX renderer (render()), --company CLI flag, human verification checkpoint
 
 ### Phase 3: Full Tables, Balance & Lenient Path
 **Goal**: A user running lenient conversion gets every readable table extracted — including operational tables and a recomputed trial balance — plus a problems sheet listing anything that was skipped
@@ -114,7 +114,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Journal Slice | 4/4 | Complete   | 2026-05-15 |
-| 2. ZIP & Subaccounts | 2/3 | In Progress|  |
+| 2. ZIP & Subaccounts | 3/3 | Complete   | 2026-05-16 |
 | 3. Full Tables, Balance & Lenient Path | 0/TBD | Not started | - |
 | 4. Full CLI & PyPI Publication | 0/TBD | Not started | - |
 | 5. Browser PWA | 0/TBD | Not started | - |
