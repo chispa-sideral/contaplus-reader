@@ -703,6 +703,64 @@ def test_subcta_candidate_fallback(tmp_path_factory: pytest.TempPathFactory) -> 
     assert data.journal.rows[0].subcuenta_nombre == "Cliente XYZ"  # type: ignore[attr-defined]
 
 
+def test_subcta_lookup_whitespace_padded_cod_matches(
+    tmp_path_factory: pytest.TempPathFactory,
+) -> None:
+    """WR-04: A SUBCTA `cod` with surrounding whitespace still enriches the journal.
+
+    The lookup key and the journal `subcuenta` key must be normalised
+    identically (both fully stripped). A leading-space `cod` must not produce
+    a silent enrichment miss.
+    """
+    import dbf as _dbflib
+    import zipfile as _zipfile
+
+    dbf_dir = tmp_path_factory.mktemp("subcta_padded_cod")
+    diario_path = dbf_dir / "DIARIO.DBF"
+    _diario_spec = (
+        "ASIEN N(6,0); FECHA D; SUBCTA C(12); CONTRA C(12); "
+        "CONCEPTO C(25); EURODEBE N(16,2); EUROHABER N(16,2)"
+    )
+    t = _dbflib.Table(filename=str(diario_path), field_specs=_diario_spec, codepage="cp850")
+    t.open(mode=_dbflib.READ_WRITE)
+    try:
+        t.append({
+            "asien": 1,
+            "fecha": _dt.date(2025, 1, 1),
+            "subcta": "4300000",
+            "contra": "",
+            "concepto": "Test",
+            "eurodebe": 100.0,
+            "eurohaber": 0.0,
+        })
+    finally:
+        t.close()
+
+    # SUBCTA whose `cod` carries a leading space -- rstrip() alone would not
+    # remove it, leaving the key as " 4300000" which never matches "4300000".
+    padded_subcta_path = dbf_dir / "SubCta.dbf"
+    padded_spec = "cod C(12); titulo C(40)"
+    t2 = _dbflib.Table(
+        filename=str(padded_subcta_path), field_specs=padded_spec, codepage="cp850"
+    )
+    t2.open(mode=_dbflib.READ_WRITE)
+    try:
+        t2.append({"cod": " 4300000", "titulo": "Cliente XYZ"})
+    finally:
+        t2.close()
+
+    zip_path = dbf_dir / "backup_padded.zip"
+    with _zipfile.ZipFile(zip_path, "w") as zf:
+        zf.write(diario_path, arcname="Emp01/Diario.dbf")
+        zf.write(padded_subcta_path, arcname="Emp01/SubCta.dbf")
+
+    data = read(zip_path.read_bytes())
+    assert data.journal is not None
+    assert len(data.journal.rows) == 1
+    # WR-04: whitespace-padded cod must still match the journal subcuenta.
+    assert data.journal.rows[0].subcuenta_nombre == "Cliente XYZ"
+
+
 def test_subcta_numeric_cod_field_no_crash(
     tmp_path_factory: pytest.TempPathFactory,
 ) -> None:

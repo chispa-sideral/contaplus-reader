@@ -15,6 +15,7 @@ Decision refs:
 
 from __future__ import annotations
 
+import logging
 import struct
 from pathlib import Path
 
@@ -27,6 +28,8 @@ from contaplus_reader.models import (
     SubctaRow,
     SubctaTable,
 )
+
+logger = logging.getLogger("contaplus_reader._subcta")
 
 # SUBCTA field-name variants (RESEARCH.md §SUBCTA Schema, D-16).
 # Real archives use cod/titulo; codigo/descrip are defensive fallbacks.
@@ -48,6 +51,21 @@ def _as_str(value: object) -> str:
     if value is None:
         return ""
     return str(value).rstrip()
+
+
+def _as_key(value: object) -> str:
+    """Coerce a dbfread field value to a fully-stripped lookup key (WR-04).
+
+    Unlike ``_as_str`` (right-strip only, for display text), this strips
+    *both* ends. SUBCTA ``cod`` and journal ``subcuenta`` must be normalised
+    identically or a leading-space ``cod`` survives in the lookup but never
+    matches the digit-only journal key -- a silent enrichment miss.
+    """
+    if isinstance(value, str):
+        return value.strip()
+    if value is None:
+        return ""
+    return str(value).strip()
 
 
 def build_subcta_lookup(subcta_path: Path) -> dict[str, str | None]:
@@ -81,8 +99,10 @@ def build_subcta_lookup(subcta_path: Path) -> dict[str, str | None]:
         )
         # CR-02: coerce defensively -- a numeric SUBCTA `cod`/`titulo` field
         # must not crash with AttributeError on `.rstrip()`.
+        # WR-04: the key is fully stripped (both ends) so it normalises
+        # identically to the digit-only journal `subcuenta` key.
         return {
-            _as_str(rec.get(cod_col)): (_as_str(rec.get(titulo_col)) or None)
+            _as_key(rec.get(cod_col)): (_as_str(rec.get(titulo_col)) or None)
             for rec in table
             if rec.get(cod_col)
         }

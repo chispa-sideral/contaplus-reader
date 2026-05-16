@@ -150,6 +150,10 @@ def _read_dbf_path(
 
         rows: list[JournalRow] = []
         skipped_memo = 0
+        # WR-04: count journal rows whose subcuenta is absent from a
+        # *non-empty* lookup -- a high miss rate signals a key-normalisation
+        # bug rather than genuinely-absent codes.
+        enrichment_misses = 0
 
         for idx, record in enumerate(table):
             # D-C4: null FECHA is a broken row -- raise immediately
@@ -209,6 +213,9 @@ def _read_dbf_path(
             subcuenta_nombre: str | None = None
             if subcta_lookup is not None:
                 subcuenta_nombre = subcta_lookup.get(subcuenta)  # None if key absent
+                # WR-04: track misses against a non-empty lookup.
+                if subcuenta_nombre is None and subcta_lookup:
+                    enrichment_misses += 1
 
             rows.append(
                 JournalRow(
@@ -225,6 +232,15 @@ def _read_dbf_path(
         if skipped_memo:
             logger.info(
                 "_read_dbf_path skipped %d memo lines (zero amounts)", skipped_memo
+            )
+
+        # WR-04: surface enrichment miss rate so a near-total miss (likely a
+        # key-normalisation bug) is visible rather than silently masked.
+        if enrichment_misses:
+            logger.info(
+                "_read_dbf_path: %d of %d journal rows had no SUBCTA match",
+                enrichment_misses,
+                len(rows),
             )
 
         return ContaPlusJournal(
