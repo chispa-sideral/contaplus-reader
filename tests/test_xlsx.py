@@ -1,15 +1,17 @@
-"""Tests for contaplus_reader.xlsx -- render_journal() XLSX renderer.
+"""Tests for contaplus_reader.xlsx -- render_journal() XLSX renderer + render() multi-sheet.
 
 Tests cover:
 - Returns non-empty bytes that openpyxl can load
-- Spanish headers in row 1
+- Spanish headers in row 1 (Phase 2: 7 columns with Descripción at index 4)
 - Header row has bold white font and 4472C4 fill
 - freeze_panes = "A2"
-- debe/haber columns have accounting number format
+- debe/haber columns have accounting number format (Phase 2: columns 5 and 6)
 - fecha column has DD/MM/YYYY format
 - Empty journal (rows=[]) still produces a valid workbook with header row
 - Column widths are set
 - Negative debe values are stored correctly (not stripped)
+- Phase 2: render(ContaPlusData) produces multi-sheet workbook
+- Phase 2: Descripción column at index 4 in Diario sheet
 """
 
 from __future__ import annotations
@@ -100,20 +102,26 @@ def test_active_sheet_title_is_diario() -> None:
 # ---------------------------------------------------------------------------
 
 def test_headers_constant_is_spanish() -> None:
-    """HEADERS constant must list the Spanish column names."""
+    """HEADERS constant must list the Spanish column names.
+
+    Phase 2 (D-15): Descripción inserted after Subcuenta at index 3.
+    """
     from contaplus_reader.xlsx import HEADERS
 
-    assert HEADERS == ["Fecha", "Cuenta", "Subcuenta", "Debe", "Haber", "Concepto"]
+    assert HEADERS == ["Fecha", "Cuenta", "Subcuenta", "Descripción", "Debe", "Haber", "Concepto"]
 
 
 def test_xlsx_row1_headers_are_spanish() -> None:
-    """Row 1 cells must contain the Spanish header names."""
+    """Row 1 cells must contain the Spanish header names.
+
+    Phase 2 (D-15): 7 columns including Descripción at column 4.
+    """
     from contaplus_reader.xlsx import render_journal, HEADERS
 
     journal = _make_journal(_sample_row())
     ws = load_workbook(io.BytesIO(render_journal(journal))).active
     actual = [ws.cell(row=1, column=i + 1).value for i in range(len(HEADERS))]  # type: ignore[union-attr]
-    assert actual == ["Fecha", "Cuenta", "Subcuenta", "Debe", "Haber", "Concepto"]
+    assert actual == ["Fecha", "Cuenta", "Subcuenta", "Descripción", "Debe", "Haber", "Concepto"]
 
 
 # ---------------------------------------------------------------------------
@@ -161,21 +169,27 @@ def test_freeze_panes_is_a2() -> None:
 # ---------------------------------------------------------------------------
 
 def test_debe_column_has_accounting_format() -> None:
-    """Data rows in column 4 (Debe) must have the accounting number format."""
-    from contaplus_reader.xlsx import render_journal, ACCOUNTING_FMT
+    """Data rows in column 5 (Debe) must have the accounting number format.
 
-    journal = _make_journal(_sample_row())
-    ws = load_workbook(io.BytesIO(render_journal(journal))).active
-    assert ws.cell(row=2, column=4).number_format == ACCOUNTING_FMT  # type: ignore[union-attr]
-
-
-def test_haber_column_has_accounting_format() -> None:
-    """Data rows in column 5 (Haber) must have the accounting number format."""
+    Phase 2 (D-15): Debe moved to column 5 (Descripción inserted at column 4).
+    """
     from contaplus_reader.xlsx import render_journal, ACCOUNTING_FMT
 
     journal = _make_journal(_sample_row())
     ws = load_workbook(io.BytesIO(render_journal(journal))).active
     assert ws.cell(row=2, column=5).number_format == ACCOUNTING_FMT  # type: ignore[union-attr]
+
+
+def test_haber_column_has_accounting_format() -> None:
+    """Data rows in column 6 (Haber) must have the accounting number format.
+
+    Phase 2 (D-15): Haber moved to column 6 (Descripción inserted at column 4).
+    """
+    from contaplus_reader.xlsx import render_journal, ACCOUNTING_FMT
+
+    journal = _make_journal(_sample_row())
+    ws = load_workbook(io.BytesIO(render_journal(journal))).active
+    assert ws.cell(row=2, column=6).number_format == ACCOUNTING_FMT  # type: ignore[union-attr]
 
 
 def test_fecha_column_has_date_format() -> None:
@@ -192,7 +206,10 @@ def test_fecha_column_has_date_format() -> None:
 # ---------------------------------------------------------------------------
 
 def test_negative_debe_value_stored_not_stripped() -> None:
-    """Negative debe values must be stored as-is (visual red comes from format, not sign removal)."""
+    """Negative debe values must be stored as-is (visual red comes from format, not sign removal).
+
+    Phase 2 (D-15): Debe is now column 5 (Descripción inserted at column 4).
+    """
     from contaplus_reader.xlsx import render_journal
 
     row = JournalRow(
@@ -205,11 +222,14 @@ def test_negative_debe_value_stored_not_stripped() -> None:
     )
     journal = _make_journal(row)
     ws = load_workbook(io.BytesIO(render_journal(journal))).active
-    assert ws.cell(row=2, column=4).value == -52.56  # type: ignore[union-attr]
+    assert ws.cell(row=2, column=5).value == -52.56  # type: ignore[union-attr]
 
 
 def test_negative_haber_value_stored_not_stripped() -> None:
-    """Negative haber values must be stored as-is."""
+    """Negative haber values must be stored as-is.
+
+    Phase 2 (D-15): Haber is now column 6 (Descripción inserted at column 4).
+    """
     from contaplus_reader.xlsx import render_journal
 
     row = JournalRow(
@@ -222,7 +242,7 @@ def test_negative_haber_value_stored_not_stripped() -> None:
     )
     journal = _make_journal(row)
     ws = load_workbook(io.BytesIO(render_journal(journal))).active
-    assert ws.cell(row=2, column=5).value == -100.00  # type: ignore[union-attr]
+    assert ws.cell(row=2, column=6).value == -100.00  # type: ignore[union-attr]
 
 
 # ---------------------------------------------------------------------------
@@ -277,7 +297,10 @@ def test_column_widths_are_set() -> None:
 
 
 def test_column_width_not_truncated_by_zero_values() -> None:
-    """WR-02: Column with haber=0.0 must not have zero width (0.0 must not count as empty)."""
+    """WR-02: Column with haber=0.0 must not have zero width (0.0 must not count as empty).
+
+    Phase 2 (D-15): Haber is now column F (index 6), was column E (index 5).
+    """
     from contaplus_reader.xlsx import render_journal
 
     row = JournalRow(
@@ -290,8 +313,8 @@ def test_column_width_not_truncated_by_zero_values() -> None:
     )
     journal = _make_journal(row)
     ws = load_workbook(io.BytesIO(render_journal(journal))).active
-    # Column E is Haber (index 5); header "Haber" has len=5; data 0.0 has len=3
-    haber_col_width = ws.column_dimensions["E"].width  # type: ignore[union-attr]
+    # Column F is Haber (index 6); header "Haber" has len=5; data 0.0 has len=3
+    haber_col_width = ws.column_dimensions["F"].width  # type: ignore[union-attr]
     assert haber_col_width is not None
     assert haber_col_width > 0
 
@@ -301,7 +324,10 @@ def test_column_width_not_truncated_by_zero_values() -> None:
 # ---------------------------------------------------------------------------
 
 def test_data_values_round_trip() -> None:
-    """Values written to the sheet must match the input JournalRow."""
+    """Values written to the sheet must match the input JournalRow.
+
+    Phase 2 (D-15): col 4=Descripción (None->blank), col 5=debe, col 6=haber, col 7=concepto.
+    """
     from contaplus_reader.xlsx import render_journal
 
     row = JournalRow(
@@ -322,9 +348,11 @@ def test_data_values_round_trip() -> None:
     assert fecha_val == datetime.date(2025, 6, 15)
     assert ws.cell(row=2, column=2).value == "4300"  # type: ignore[union-attr]
     assert ws.cell(row=2, column=3).value == "4300001"  # type: ignore[union-attr]
-    assert ws.cell(row=2, column=4).value == 1500.75  # type: ignore[union-attr]
-    assert ws.cell(row=2, column=5).value == 0.0  # type: ignore[union-attr]
-    assert ws.cell(row=2, column=6).value == "Invoice payment"  # type: ignore[union-attr]
+    # col 4 = Descripción; subcuenta_nombre is None -> stored as None (blank cell)
+    assert ws.cell(row=2, column=4).value is None  # type: ignore[union-attr]
+    assert ws.cell(row=2, column=5).value == 1500.75  # type: ignore[union-attr]
+    assert ws.cell(row=2, column=6).value == 0.0  # type: ignore[union-attr]
+    assert ws.cell(row=2, column=7).value == "Invoice payment"  # type: ignore[union-attr]
 
 
 # ===========================================================================
@@ -335,7 +363,6 @@ def test_data_values_round_trip() -> None:
 # D-12 / D-14: Multi-sheet workbook
 # ---------------------------------------------------------------------------
 
-@pytest.mark.xfail(strict=False, reason="Phase 2: render() multi-sheet function not yet implemented")
 def test_render_multi_sheet_names() -> None:
     """D-12 / D-14: render(data) must produce a workbook with 'Diario' and 'Subcuentas' sheets.
 
@@ -367,7 +394,6 @@ def test_render_multi_sheet_names() -> None:
     assert "Subcuentas" in sheet_names, f"Expected 'Subcuentas' sheet, got: {sheet_names}"
 
 
-@pytest.mark.xfail(strict=False, reason="Phase 2: Descripción column and render() not yet implemented")
 def test_render_descripcion_column_present() -> None:
     """D-15: Diario sheet must have 'Descripción' header after 'Subcuenta', with values.
 
