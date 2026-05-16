@@ -51,13 +51,23 @@ Plans:
 **Goal**: A user can convert a full ContaPlus backup `.zip` — including SUBCTA enrichment of the journal — to a multi-sheet `.xlsx`
 **Mode:** mvp
 **Depends on**: Phase 1
-**Requirements**: INPUT-02, INPUT-04, INPUT-05, INPUT-06, TABL-01, TABL-02, API-05
+**Requirements**: INPUT-02, INPUT-04, INPUT-05, INPUT-06, TABL-01, TABL-02, API-05, CLI-02
 **Success Criteria** (what must be TRUE):
   1. Running `contaplus2xlsx backup.zip out.xlsx` produces a `.xlsx` with a journal sheet where account names are populated from `SUBCTA.DBF`
   2. A multi-company ZIP passed without a `--company` flag exits with an error listing the available company names
   3. ZIP extraction rejects a path-traversal entry (zip-slip attack) with a structured error
   4. The `.xlsx` includes sheets for `SUBCTA`, `grupos`, `usuarios`, and `empresa` when those tables are present in the archive
-**Plans**: TBD
+**Plans**: 3 plans
+
+Plans:
+**Wave 1**
+- [ ] 02-01-PLAN.md — Test scaffold: ZIP/SUBCTA/group-table fixtures, failing tests for all 19 Phase 2 behaviors
+
+**Wave 2** *(blocked on Wave 1 completion)*
+- [ ] 02-02-PLAN.md — ZIP reader (_zip.py, _subcta.py), model extensions, sniffer upgrade, __init__ dispatch, journal enrichment
+
+**Wave 3** *(blocked on Wave 2 completion)*
+- [ ] 02-03-PLAN.md — Multi-sheet XLSX renderer (render()), --company CLI flag, human verification checkpoint
 
 ### Phase 3: Full Tables, Balance & Lenient Path
 **Goal**: A user running lenient conversion gets every readable table extracted — including operational tables and a recomputed trial balance — plus a problems sheet listing anything that was skipped
@@ -75,7 +85,7 @@ Plans:
 **Goal**: The tool is installable from PyPI, the CLI handles all v1 options, and the published wheel is ready for `micropip` consumption by the PWA
 **Mode:** mvp
 **Depends on**: Phase 3
-**Requirements**: CLI-02, CLI-03, DIST-01
+**Requirements**: CLI-03, DIST-01
 **Success Criteria** (what must be TRUE):
   1. `pip install contaplus-reader` installs the library and `contaplus2xlsx` CLI from PyPI
   2. `contaplus2xlsx backup.zip out.xlsx --company ACME` selects the correct company in a multi-company ZIP
@@ -104,7 +114,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Journal Slice | 4/4 | Complete   | 2026-05-15 |
-| 2. ZIP & Subaccounts | 0/TBD | Not started | - |
+| 2. ZIP & Subaccounts | 0/3 | Not started | - |
 | 3. Full Tables, Balance & Lenient Path | 0/TBD | Not started | - |
 | 4. Full CLI & PyPI Publication | 0/TBD | Not started | - |
 | 5. Browser PWA | 0/TBD | Not started | - |
