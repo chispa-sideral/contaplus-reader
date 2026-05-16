@@ -485,6 +485,26 @@ def test_read_zipslip_rejected(zip_slip_zip: Path) -> None:
     assert "Unsafe ZIP entry" in exc_info.value.message or "ZIP" in exc_info.value.message
 
 
+def test_read_zipslip_backslash_rejected(zip_slip_backslash_zip: Path) -> None:
+    """CR-01: A back-slash path-traversal entry must raise ContaPlusReadError.
+
+    The guard validates and writes the SAME string, so a '..\\..\\evil.dbf'
+    entry whose forward-slash form escapes the temp dir is rejected.
+    """
+    zip_bytes = zip_slip_backslash_zip.read_bytes()
+    with pytest.raises(ContaPlusReadError) as exc_info:
+        read(zip_bytes)
+    assert "Unsafe ZIP entry" in exc_info.value.message
+
+
+def test_read_zipslip_absolute_rejected(zip_slip_absolute_zip: Path) -> None:
+    """CR-01: An absolute-path entry ('/etc/passwd') must raise ContaPlusReadError."""
+    zip_bytes = zip_slip_absolute_zip.read_bytes()
+    with pytest.raises(ContaPlusReadError) as exc_info:
+        read(zip_bytes)
+    assert "Unsafe ZIP entry" in exc_info.value.message
+
+
 # ---------------------------------------------------------------------------
 # INPUT-06: Multi-company ZIP disambiguation
 # ---------------------------------------------------------------------------

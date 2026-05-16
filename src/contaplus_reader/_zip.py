@@ -18,18 +18,38 @@ RESEARCH.md Pitfall references:
 from __future__ import annotations
 
 import io
+import shutil
+import stat
 import zipfile
 from pathlib import Path
 
 from contaplus_reader.models import ContaPlusReadError
 
+# WR-02: Decompression guards against zip-bombs. The CLI processes untrusted
+# ContaPlus exports; an attacker-crafted archive must not exhaust disk/memory.
+_MAX_TOTAL_UNCOMPRESSED = 500 * 1024 * 1024  # 500 MB total uncompressed
+_MAX_ENTRY_COUNT = 10_000  # entry-count cap
+_MAX_COMPRESSION_RATIO = 200  # per-entry uncompressed/compressed ratio cap
+
+# WR-01: Unix symlink mode bit. A ZIP entry whose external_attr high bits mark
+# it a symlink is a secondary traversal vector and is rejected outright.
+_S_IFLNK = stat.S_IFLNK  # 0o120000
+_S_IFMT = stat.S_IFMT  # 0o170000
+
 
 def _safe_extract_zip(raw: bytes, extract_dir: Path) -> None:
-    """Extract ZIP bytes to extract_dir, rejecting any zip-slip entries.
+    """Extract ZIP bytes to extract_dir, rejecting any unsafe entries.
 
-    Per-entry zip-slip check: normalize backslashes then use
-    target.relative_to(base) before calling zf.extract().
-    Raises ContaPlusReadError on any entry that would escape the temp dir.
+    Security guards (this code processes untrusted archives):
+      CR-01: The path that is validated is byte-for-byte the path that is
+             written. Members are NOT handed to ``zf.extract()`` (which applies
+             its own, different sanitisation); instead each member is copied to
+             the exact resolved path that ``relative_to`` checked.
+      WR-01: Entries whose Unix mode bits mark them a symlink are rejected --
+             a benign-named symlink entry is a secondary traversal vector.
+      WR-02: The archive is rejected up-front if its total uncompressed size,
+             entry count, or any per-entry compression ratio is implausible
+             (zip-bomb defence).
 
     Args:
         raw: ZIP file contents as bytes.
@@ -37,15 +57,64 @@ def _safe_extract_zip(raw: bytes, extract_dir: Path) -> None:
 
     Raises:
         ContaPlusReadError: If any entry name escapes extract_dir (zip-slip),
-                            or if the bytes are not a valid ZIP file.
+                            is a symlink, the archive is a suspected zip-bomb,
+                            or the bytes are not a valid ZIP file.
     """
     try:
         base = extract_dir.resolve()
         with zipfile.ZipFile(io.BytesIO(raw)) as zf:
-            for member in zf.infolist():
-                # Pitfall 2: normalize Windows backslash before resolve
+            members = zf.infolist()
+
+            # WR-02: zip-bomb defence -- validate aggregate size before extracting.
+            if len(members) > _MAX_ENTRY_COUNT:
+                raise ContaPlusReadError(
+                    row_index=-1,
+                    column=None,
+                    message=(
+                        f"ZIP rejected: {len(members)} entries exceeds the "
+                        f"{_MAX_ENTRY_COUNT}-entry limit"
+                    ),
+                )
+            total_uncompressed = sum(m.file_size for m in members)
+            if total_uncompressed > _MAX_TOTAL_UNCOMPRESSED:
+                raise ContaPlusReadError(
+                    row_index=-1,
+                    column=None,
+                    message=(
+                        f"ZIP rejected: uncompressed size {total_uncompressed} "
+                        f"bytes exceeds the {_MAX_TOTAL_UNCOMPRESSED}-byte limit"
+                    ),
+                )
+
+            for member in members:
+                if member.is_dir():
+                    continue
+
+                # WR-02: reject implausibly high per-entry compression ratios.
+                if member.compress_size > 0:
+                    ratio = member.file_size / member.compress_size
+                    if ratio > _MAX_COMPRESSION_RATIO:
+                        raise ContaPlusReadError(
+                            row_index=-1,
+                            column=None,
+                            message=(
+                                f"ZIP rejected: entry {member.filename!r} has an "
+                                f"implausible compression ratio ({ratio:.0f}:1)"
+                            ),
+                        )
+
+                # WR-01: reject symlink entries (Unix mode bits in external_attr).
+                if (member.external_attr >> 16) & _S_IFMT == _S_IFLNK:
+                    raise ContaPlusReadError(
+                        row_index=-1,
+                        column=None,
+                        message=f"Unsafe ZIP entry (symlink): {member.filename!r}",
+                    )
+
+                # Pitfall 2: normalize Windows backslash before resolve.
                 clean = member.filename.replace("\\", "/")
                 target = (extract_dir / clean).resolve()
+                # CR-01: validate the resolved target path...
                 try:
                     target.relative_to(base)
                 except ValueError:
@@ -54,7 +123,11 @@ def _safe_extract_zip(raw: bytes, extract_dir: Path) -> None:
                         column=None,
                         message=f"Unsafe ZIP entry: {member.filename!r}",
                     )
-                zf.extract(member, extract_dir)
+                # ...and write to that exact validated path -- never zf.extract(),
+                # which would re-derive (and differently sanitise) the path.
+                target.parent.mkdir(parents=True, exist_ok=True)
+                with zf.open(member) as src, open(target, "wb") as dst:
+                    shutil.copyfileobj(src, dst)
     except ContaPlusReadError:
         raise  # re-raise structured errors unchanged
     except (zipfile.BadZipFile, OSError) as exc:

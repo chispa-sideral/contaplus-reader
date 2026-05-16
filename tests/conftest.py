@@ -344,3 +344,32 @@ def zip_slip_zip(tmp_path_factory: pytest.TempPathFactory) -> Path:
     with zipfile.ZipFile(zip_path, "w") as zf:
         zf.writestr("../evil.dbf", b"")
     return zip_path
+
+
+@pytest.fixture(scope="session")
+def zip_slip_backslash_zip(tmp_path_factory: pytest.TempPathFactory) -> Path:
+    """ZIP with a back-slash path-traversal entry (CR-01).
+
+    On POSIX a back-slash is an ordinary filename character, so the raw entry
+    name and its forward-slash-normalised form differ. The extractor must
+    validate and write the SAME string -- this fixture pins that.
+    """
+    zip_dir = tmp_path_factory.mktemp("zip_slip_backslash_zip")
+    zip_path = zip_dir / "evil_backslash.zip"
+    with zipfile.ZipFile(zip_path, "w") as zf:
+        zf.writestr("..\\..\\evil.dbf", b"")
+    return zip_path
+
+
+@pytest.fixture(scope="session")
+def zip_slip_absolute_zip(tmp_path_factory: pytest.TempPathFactory) -> Path:
+    """ZIP with an absolute-path entry for zip-slip security tests (CR-01).
+
+    A POSIX-style absolute entry '/etc/passwd' must be rejected: it resolves
+    outside the extraction directory.
+    """
+    zip_dir = tmp_path_factory.mktemp("zip_slip_absolute_zip")
+    zip_path = zip_dir / "evil_absolute.zip"
+    with zipfile.ZipFile(zip_path, "w") as zf:
+        zf.writestr("/etc/passwd", b"")
+    return zip_path
