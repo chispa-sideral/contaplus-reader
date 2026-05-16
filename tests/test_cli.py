@@ -188,7 +188,6 @@ def test_cli_help_shows_force_option() -> None:
 # CLI-02: --company flag
 # ---------------------------------------------------------------------------
 
-@pytest.mark.xfail(strict=False, reason="Phase 2: --company flag not yet implemented")
 def test_cli_company_flag_accepted(
     tmp_path: Path,
     single_company_zip_with_subcta: Path,
@@ -212,7 +211,6 @@ def test_cli_company_flag_accepted(
     assert out.exists()
 
 
-@pytest.mark.xfail(strict=False, reason="Phase 2: ZIP reading and --company flag not yet implemented")
 def test_cli_multi_company_no_flag_exits_1(
     tmp_path: Path,
     multi_company_zip: Path,
