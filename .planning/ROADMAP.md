@@ -64,7 +64,7 @@ Plans:
 - [x] 02-01-PLAN.md — Test scaffold: ZIP/SUBCTA/group-table fixtures, failing tests for all 19 Phase 2 behaviors
 
 **Wave 2** *(blocked on Wave 1 completion)*
-- [ ] 02-02-PLAN.md — ZIP reader (_zip.py, _subcta.py), model extensions, sniffer upgrade, __init__ dispatch, journal enrichment
+- [x] 02-02-PLAN.md — ZIP reader (_zip.py, _subcta.py), model extensions, sniffer upgrade, __init__ dispatch, journal enrichment
 
 **Wave 3** *(blocked on Wave 2 completion)*
 - [ ] 02-03-PLAN.md — Multi-sheet XLSX renderer (render()), --company CLI flag, human verification checkpoint
@@ -114,7 +114,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Journal Slice | 4/4 | Complete   | 2026-05-15 |
-| 2. ZIP & Subaccounts | 1/3 | In Progress|  |
+| 2. ZIP & Subaccounts | 2/3 | In Progress|  |
 | 3. Full Tables, Balance & Lenient Path | 0/TBD | Not started | - |
 | 4. Full CLI & PyPI Publication | 0/TBD | Not started | - |
 | 5. Browser PWA | 0/TBD | Not started | - |
