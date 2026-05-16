@@ -587,22 +587,16 @@ def single_company_zip(cp850_basic_dbf: Path,
 
 ---
 
-## Open Questions
+## Open Questions (RESOLVED)
 
-1. **Where do `grupos.dbf`, `usuarios.dbf`, `empresa.dbf` live in archives that DO contain them?**
-   - What we know: absent from all 5 real archives; SEED says "some installs include adjacent group metadata"
-   - What's unclear: are they in `EmpNN/` or at the archive root?
-   - Recommendation: implement search in `EmpNN/` directory (same as SUBCTA); if a future real archive has them at root, the `_find_sibling_dbf` helper is easy to extend. Plan a "search sibling dir AND root" fallback.
+1. **Where do `grupos.dbf`, `usuarios.dbf`, `empresa.dbf` live in archives that DO contain them?** **RESOLVED**
+   - Resolution: search in `EmpNN/` directory (same as SUBCTA) via `_find_sibling_dbf`. Absent from all 5 real archives — treat as optional. If a future archive has them at root, `_find_sibling_dbf` is easy to extend.
 
-2. **Should `TemporaryDirectory` be owned by `read()` or by a private extraction function?**
-   - What we know: tmpdir must outlive all DBF reads; the entire pipeline (extract, build lookup, read journal, read secondary tables) must complete before cleanup
-   - What's unclear: planner decision — `read()` owns lifecycle, or extraction function returns (tmpdir, paths) tuple
-   - Recommendation: `read()` owns the tmpdir via a `with tempfile.TemporaryDirectory() as tmpdir:` block enclosing the entire pipeline.
+2. **Should `TemporaryDirectory` be owned by `read()` or by a private extraction function?** **RESOLVED**
+   - Resolution: `read()` owns the tmpdir via a `with tempfile.TemporaryDirectory() as tmpdir:` block enclosing the entire pipeline (extract, build lookup, read journal, read secondary tables). This prevents premature cleanup on Windows (Pitfall 1).
 
-3. **Does the `render_journal()` name become `render()` or does `render_journal()` remain as an alias?**
-   - What we know: D-12 says the renderer "generalizes"; Phase 1 tests import `render_journal`
-   - What's unclear: breaking-change policy for Phase 2
-   - Recommendation: Add `render(data: ContaPlusData)` as the new entrypoint; keep `render_journal(journal: ContaPlusJournal)` as a convenience wrapper calling `render(ContaPlusData(journal=journal))` for backward compatibility in Phase 1 tests.
+3. **Does the `render_journal()` name become `render()` or does `render_journal()` remain as an alias?** **RESOLVED**
+   - Resolution: `render(data: ContaPlusData)` is the new entrypoint; `render_journal(journal: ContaPlusJournal)` is kept as a backward-compatible alias calling `render(ContaPlusData(journal=journal))` so Phase 1 tests continue to pass without modification.
 
 ---
 
