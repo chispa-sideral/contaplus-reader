@@ -86,8 +86,32 @@ def main(
         )
         raise typer.Exit(1) from None  # `from None` suppresses the traceback chain.
 
-    xlsx_bytes = render(data)
-    output_file.write_bytes(xlsx_bytes)
+    # WR-06 / D-17: render and write are outside the read() handler -- an
+    # OSError on write (read-only dir, disk full, permission denied) or any
+    # failure inside openpyxl must surface as a Rich panel, never a traceback.
+    try:
+        xlsx_bytes = render(data)
+    except Exception as exc:  # noqa: BLE001 -- openpyxl raises a broad set
+        console.print(
+            Panel(
+                str(exc),
+                title="XLSX Render Error",
+                border_style="red",
+            )
+        )
+        raise typer.Exit(1) from None
+
+    try:
+        output_file.write_bytes(xlsx_bytes)
+    except OSError as exc:
+        console.print(
+            Panel(
+                str(exc),
+                title="File Write Error",
+                border_style="red",
+            )
+        )
+        raise typer.Exit(1) from None
 
     # D-16: Concise success summary with row count, sheet count, and optional skip count.
     journal = data.journal

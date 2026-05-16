@@ -169,6 +169,32 @@ def test_cli_nonexistent_input_exits_nonzero(tmp_path: Path) -> None:
 
 
 # ---------------------------------------------------------------------------
+# WR-06: Output write failure exits 1 with a Rich panel, no traceback
+# ---------------------------------------------------------------------------
+
+def test_cli_unwritable_output_exits_nonzero(tmp_path: Path, cp850_basic_dbf: Path) -> None:
+    """WR-06: A write failure on the output file exits 1 with no Python traceback.
+
+    Pointing the output at a path inside a non-existent directory makes
+    write_bytes() raise OSError -- which must be caught and surfaced as a
+    Rich panel (D-17 'no traceback' contract), not leaked as a traceback.
+    """
+    # Parent directory does not exist -> write_bytes() raises OSError.
+    out = tmp_path / "no_such_dir" / "out.xlsx"
+    result = runner.invoke(app, [str(cp850_basic_dbf), str(out)])
+    assert result.exit_code == 1
+    combined = result.output + (result.stderr if hasattr(result, "stderr") and result.stderr else "")
+    assert "Traceback" not in combined
+    assert "most recent call last" not in combined
+    # The write failure must be surfaced via the Rich panel.
+    assert "File Write Error" in combined
+    if result.exception is not None:
+        assert isinstance(result.exception, SystemExit), (
+            f"Expected SystemExit (from typer.Exit), got raw exception: {result.exception!r}"
+        )
+
+
+# ---------------------------------------------------------------------------
 # --help output (Pitfall 6)
 # ---------------------------------------------------------------------------
 
