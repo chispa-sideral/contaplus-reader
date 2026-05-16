@@ -34,6 +34,22 @@ _SUBCTA_COD_CANDIDATES: tuple[str, ...] = ("cod", "codigo")
 _SUBCTA_TITULO_CANDIDATES: tuple[str, ...] = ("titulo", "descrip")
 
 
+def _as_str(value: object) -> str:
+    """Coerce a dbfread field value to a right-stripped str (CR-02).
+
+    Character fields decode to ``str``; numeric (type ``N``) fields decode to
+    ``int``/``Decimal``. Calling ``.rstrip()`` directly on a non-str crashes
+    with ``AttributeError``. This mirrors the ``isinstance(..., str)`` guards
+    in ``_reader.py`` so a numeric SUBCTA ``cod`` cannot escape as an
+    unstructured crash.
+    """
+    if isinstance(value, str):
+        return value.rstrip()
+    if value is None:
+        return ""
+    return str(value).rstrip()
+
+
 def build_subcta_lookup(subcta_path: Path) -> dict[str, str | None]:
     """Build a cod -> titulo lookup dict from SUBCTA.DBF.
 
@@ -63,14 +79,16 @@ def build_subcta_lookup(subcta_path: Path) -> dict[str, str | None]:
         titulo_col = _pick_column(
             field_set, _SUBCTA_TITULO_CANDIDATES, kind="subcta.titulo"
         )
+        # CR-02: coerce defensively -- a numeric SUBCTA `cod`/`titulo` field
+        # must not crash with AttributeError on `.rstrip()`.
         return {
-            rec[cod_col].rstrip(): (rec[titulo_col] or "").rstrip() or None
+            _as_str(rec.get(cod_col)): (_as_str(rec.get(titulo_col)) or None)
             for rec in table
             if rec.get(cod_col)
         }
     except ContaPlusReadError:
         raise  # present-but-unreadable -> abort (D-06); already structured
-    except (struct.error, ValueError, OSError, UnicodeDecodeError) as exc:
+    except (struct.error, ValueError, OSError, UnicodeDecodeError, AttributeError, TypeError) as exc:
         raise ContaPlusReadError(
             row_index=-1,
             column=None,
