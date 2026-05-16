@@ -40,12 +40,21 @@ def _pick_column(
 ) -> str:
     """Return the first candidate name that exists in field_set.
 
+    Case-insensitive: both ``field_set`` and ``candidates`` are compared in
+    lower case, so callers need not pre-lowercase their input (WR-03). The
+    returned name is the actual member of ``field_set`` (original casing
+    preserved), so it can be used to index records directly.
+
     Raises:
         ContaPlusReadError: If none of the candidates are present.
     """
-    for name in candidates:
-        if name in field_set:
-            return name
+    # WR-03: lower-case both sides so the helper does not depend on an
+    # unstated "caller pre-lowercased the set" invariant.
+    lower_to_original = {name.lower(): name for name in field_set}
+    for candidate in candidates:
+        original = lower_to_original.get(candidate.lower())
+        if original is not None:
+            return original
     raise ContaPlusReadError(
         row_index=-1,
         column=kind,

@@ -168,6 +168,35 @@ def test_non_journal_dbf_rejected(
 
 
 # ---------------------------------------------------------------------------
+# WR-03: _pick_column is case-insensitive regardless of caller's field_set shape
+# ---------------------------------------------------------------------------
+
+def test_pick_column_case_insensitive() -> None:
+    """WR-03: _pick_column matches candidates against an upper-case field set.
+
+    The helper must not depend on the caller pre-lowercasing the set. It
+    returns the actual (original-cased) member so records can be indexed.
+    """
+    from contaplus_reader._reader import _pick_column
+
+    upper_set = {"COD", "TITULO", "NIF"}
+    assert _pick_column(upper_set, ("cod", "codigo"), kind="subcta.cod") == "COD"
+    assert (
+        _pick_column(upper_set, ("titulo", "descrip"), kind="subcta.titulo")
+        == "TITULO"
+    )
+
+
+def test_pick_column_raises_when_absent() -> None:
+    """WR-03: _pick_column still raises ContaPlusReadError when no candidate matches."""
+    from contaplus_reader._reader import _pick_column
+
+    with pytest.raises(ContaPlusReadError) as exc_info:
+        _pick_column({"FOO", "BAR"}, ("cod", "codigo"), kind="subcta.cod")
+    assert "subcta.cod" in exc_info.value.message
+
+
+# ---------------------------------------------------------------------------
 # JRNL-01: Happy path -- 3-row read, correct field values
 # ---------------------------------------------------------------------------
 
