@@ -19,7 +19,6 @@ from __future__ import annotations
 
 import io
 import shutil
-import stat
 import zipfile
 from pathlib import Path
 
@@ -31,10 +30,12 @@ _MAX_TOTAL_UNCOMPRESSED = 500 * 1024 * 1024  # 500 MB total uncompressed
 _MAX_ENTRY_COUNT = 10_000  # entry-count cap
 _MAX_COMPRESSION_RATIO = 200  # per-entry uncompressed/compressed ratio cap
 
-# WR-01: Unix symlink mode bit. A ZIP entry whose external_attr high bits mark
-# it a symlink is a secondary traversal vector and is rejected outright.
-_S_IFLNK = stat.S_IFLNK  # 0o120000
-_S_IFMT = stat.S_IFMT  # 0o170000
+# WR-01: Unix file-type mode bits. A ZIP entry whose external_attr high 16 bits,
+# masked by _S_IFMT, equal _S_IFLNK is a symlink -- a secondary traversal vector
+# -- and is rejected outright. These are stat-module constants, inlined here so
+# the values are explicit (stat.S_IFMT is a *function*, not a constant).
+_S_IFMT = 0o170000  # file-type bit mask
+_S_IFLNK = 0o120000  # symbolic link
 
 
 def _safe_extract_zip(raw: bytes, extract_dir: Path) -> None:
