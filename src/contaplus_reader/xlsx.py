@@ -126,17 +126,13 @@ def _render_journal_sheet(ws: Worksheet, journal: ContaPlusJournal) -> None:
 def _render_subcta_sheet(ws: Worksheet, subcta: SubctaTable) -> None:
     """Render the Subcuentas sheet onto ws.
 
-    Private helper. Headers are extracted from the first row's fields dict keys
-    (in insertion order, D-13). Applies D-10 styling.
+    Private helper. WR-05: headers come from the table schema
+    (``subcta.headers``), captured from the DBF itself -- not from row 0 --
+    so ragged rows cannot drop columns and a zero-row table still gets a
+    proper styled header row. Applies D-10 styling.
     """
-    if not subcta.rows:
-        # No rows -- write minimal styled header using a placeholder, then return.
-        # In practice SubctaTable with zero rows produces an empty-but-styled sheet.
-        ws.freeze_panes = "A2"
-        return
-
-    # Extract headers from first row's field keys (D-13: DBF field names in insertion order).
-    headers = list(subcta.rows[0].fields.keys())
+    # WR-05: schema-driven headers (DBF field names in original order, D-13).
+    headers = list(subcta.headers)
 
     for col_idx, header in enumerate(headers, 1):
         cell = ws.cell(row=1, column=col_idx, value=header)

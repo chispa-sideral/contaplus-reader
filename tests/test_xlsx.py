@@ -380,11 +380,9 @@ def test_render_multi_sheet_names() -> None:
     row = _sample_row()
     journal = _make_journal(row)
 
-    # Build a minimal SubctaTable (or mock) -- may not exist yet
-    try:
-        subcta = SubctaTable(rows=(), source_name=None)  # type: ignore[call-arg]
-    except Exception:
-        subcta = object()  # type: ignore[assignment]
+    # Build a minimal SubctaTable. WR-05: SubctaTable carries a `headers`
+    # schema tuple; a zero-row table still renders a styled header row.
+    subcta = SubctaTable(headers=("cod", "titulo"), rows=(), source_name=None)
 
     data = ContaPlusData(journal=journal, subcta=subcta)  # type: ignore[call-arg]
     result = render(data)
@@ -435,4 +433,52 @@ def test_render_descripcion_column_present() -> None:
     cell_value = ws.cell(row=2, column=descripcion_col).value
     assert cell_value == "Cliente XYZ", (
         f"Expected 'Cliente XYZ' in Descripción column, got: {cell_value!r}"
+    )
+
+
+# ---------------------------------------------------------------------------
+# WR-05: Subcuentas sheet headers come from the schema, not row 0
+# ---------------------------------------------------------------------------
+
+def test_subcta_sheet_headers_from_schema_not_row0() -> None:
+    """WR-05: ragged rows must not drop columns from the Subcuentas sheet.
+
+    Headers come from SubctaTable.headers (the DBF schema). Even if a later
+    row omits a key present in the schema, every schema column is rendered.
+    """
+    from contaplus_reader.models import ContaPlusData, SubctaRow, SubctaTable
+    from contaplus_reader.xlsx import render
+
+    journal = _make_journal(_sample_row())
+    # Row 0 lacks "nif"; row 1 has it. Schema declares all three columns.
+    subcta = SubctaTable(
+        headers=("cod", "titulo", "nif"),
+        rows=(
+            SubctaRow(fields={"cod": "4300000", "titulo": "Cliente XYZ"}),
+            SubctaRow(fields={"cod": "7000000", "titulo": "Ventas", "nif": "B1"}),
+        ),
+        source_name=None,
+    )
+    data = ContaPlusData(journal=journal, subcta=subcta)
+    wb = load_workbook(io.BytesIO(render(data)))
+    ws = wb["Subcuentas"]
+    header_row = [ws.cell(row=1, column=c).value for c in range(1, 4)]
+    assert header_row == ["cod", "titulo", "nif"], (
+        f"Expected all schema columns, got: {header_row}"
+    )
+
+
+def test_subcta_sheet_empty_table_has_header_row() -> None:
+    """WR-05: a zero-row SubctaTable still produces a styled header row."""
+    from contaplus_reader.models import ContaPlusData, SubctaTable
+    from contaplus_reader.xlsx import render
+
+    journal = _make_journal(_sample_row())
+    subcta = SubctaTable(headers=("cod", "titulo"), rows=(), source_name=None)
+    data = ContaPlusData(journal=journal, subcta=subcta)
+    wb = load_workbook(io.BytesIO(render(data)))
+    ws = wb["Subcuentas"]
+    header_row = [ws.cell(row=1, column=c).value for c in range(1, 3)]
+    assert header_row == ["cod", "titulo"], (
+        f"Expected header row on empty Subcuentas sheet, got: {header_row}"
     )

@@ -138,10 +138,14 @@ class SubctaRow:
 class SubctaTable:
     """Full dump of SUBCTA.DBF.
 
+    headers: DBF field names in original order (WR-05). The schema is captured
+             from the DBF itself, not derived from row 0 -- so a zero-row table
+             still has a header list and ragged rows cannot truncate columns.
     rows: all subaccount records.
     source_name: optional provenance label.
     """
 
+    headers: tuple[str, ...]
     rows: tuple[SubctaRow, ...]
     source_name: str | None = None
 

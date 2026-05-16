@@ -138,7 +138,11 @@ def read_subcta_table(subcta_path: Path) -> SubctaTable:
             encoding="cp850",
             ignore_missing_memofile=True,
         )
+        # WR-05: capture the schema from the DBF itself, not from row 0, so a
+        # ragged row or zero-row table cannot truncate/drop columns.
+        headers = tuple(f.name for f in table.fields)
         return SubctaTable(
+            headers=headers,
             rows=tuple(SubctaRow(fields=dict(rec)) for rec in table),
             source_name=str(subcta_path),
         )
