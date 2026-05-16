@@ -1,7 +1,9 @@
-"""Magic-byte sniffer: validate that input bytes look like a DBF file.
+"""Magic-byte sniffer: detect input format from magic bytes.
 
-D-05: Input type is detected by content magic-byte sniffing -- not file suffix.
-Rejects ZIP (PK magic) with a specific message; rejects anything else as "not a DBF".
+D-01/D-05: Input type is detected by content magic-byte sniffing -- not file suffix.
+Returns "dbf" for recognized DBF version bytes (0x03, 0x30, etc.).
+Returns "zip" for ZIP PK magic (0x50).
+Raises ContaPlusReadError for anything else.
 """
 
 from __future__ import annotations
@@ -28,8 +30,8 @@ _KNOWN_DBF_VERSION_BYTES: frozenset[int] = frozenset({
 })
 
 
-def sniff(data: bytes | io.IOBase) -> None:
-    """Raise ContaPlusReadError if data is not a recognized DBF file.
+def sniff(data: bytes | io.IOBase) -> str:
+    """Detect input format from magic bytes. Returns "dbf" or "zip".
 
     For bytes/bytearray: reads offset 0 directly.
     For BinaryIO: reads 1 byte then seeks back to 0 if seekable.
@@ -37,8 +39,12 @@ def sniff(data: bytes | io.IOBase) -> None:
     Args:
         data: Input to inspect.
 
+    Returns:
+        "dbf" if first byte is a recognized DBF version byte.
+        "zip" if first byte is 0x50 (ZIP PK magic).
+
     Raises:
-        ContaPlusReadError: If data is ZIP bytes or any unrecognized format.
+        ContaPlusReadError: If data is any unrecognized format (neither DBF nor ZIP).
     """
     if isinstance(data, (bytes, bytearray)):
         first_byte: int | None = data[0] if data else None
@@ -64,14 +70,16 @@ def sniff(data: bytes | io.IOBase) -> None:
                 ) from None
         first_byte = first_byte_bytes[0] if first_byte_bytes else None
 
-    if first_byte is None or first_byte not in _KNOWN_DBF_VERSION_BYTES:
-        hint = (
-            "ZIP archive detected — ZIP input is supported in a future phase"
-            if first_byte == 0x50  # 'P' -- PK magic byte
-            else "not a DBF file"
-        )
-        raise ContaPlusReadError(
-            row_index=-1,
-            column=None,
-            message=f"Unsupported input format: {hint}",
-        )
+    # D-01: ZIP PK magic byte -- return "zip" (no longer raises)
+    if first_byte == 0x50:
+        return "zip"
+
+    # Known DBF version byte -- return "dbf"
+    if first_byte is not None and first_byte in _KNOWN_DBF_VERSION_BYTES:
+        return "dbf"
+
+    raise ContaPlusReadError(
+        row_index=-1,
+        column=None,
+        message="Unsupported input format: not a DBF file",
+    )

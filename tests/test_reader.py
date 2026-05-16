@@ -415,7 +415,7 @@ def test_output_df_has_correct_columns(cp850_basic_dbf: Path) -> None:
     row = journal.rows[0]
     # Check all required fields exist on JournalRow
     field_names = {f.name for f in dataclasses.fields(row)}
-    expected = {"fecha", "cuenta", "subcuenta", "debe", "haber", "concepto"}
+    expected = {"fecha", "cuenta", "subcuenta", "debe", "haber", "concepto", "subcuenta_nombre"}
     assert expected == field_names
     # Check types
     assert isinstance(row.fecha, _dt.date)

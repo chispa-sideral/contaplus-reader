@@ -97,6 +97,7 @@ class JournalRow:
     subcuenta: full subaccount code, >=3 digits.
     debe/haber: Python float; negatives preserved (D-C1 amendment).
     concepto: stripped CONCEPTO value or None if empty.
+    subcuenta_nombre: subaccount description from SUBCTA.DBF, or None (D-09).
     """
 
     fecha: datetime.date
@@ -105,6 +106,7 @@ class JournalRow:
     debe: float
     haber: float
     concepto: str | None
+    subcuenta_nombre: str | None = None  # D-09: additive, default None
 
 
 @dataclass(frozen=True)
@@ -121,12 +123,53 @@ class ContaPlusJournal:
     source_name: str | None = None
 
 
+@dataclass(frozen=True)
+class SubctaRow:
+    """One subaccount record from SUBCTA.DBF — all fields (D-13 full dump).
+
+    Fields stored as a dict to support full-dump without enumerating
+    the 130+ field names that real archives contain.
+    """
+
+    fields: dict[str, object]
+
+
+@dataclass(frozen=True)
+class SubctaTable:
+    """Full dump of SUBCTA.DBF.
+
+    rows: all subaccount records.
+    source_name: optional provenance label.
+    """
+
+    rows: tuple[SubctaRow, ...]
+    source_name: str | None = None
+
+
+@dataclass(frozen=True)
+class GenericTable:
+    """Full dump of an undocumented table (grupos/usuarios/empresa).
+
+    headers: DBF field names in original order (D-13).
+    rows: tuples of raw field values.
+    source_name: optional provenance label.
+    """
+
+    headers: tuple[str, ...]
+    rows: tuple[tuple[object, ...], ...]
+    source_name: str | None = None
+
+
 @dataclass
 class ContaPlusData:
     """Container for all extracted ContaPlus tables.
 
-    Phase 1 populates .journal only; later phases add .subcta, .balance, etc.
+    Phase 1 populates .journal only. Phase 2 adds .subcta/.empresa/.grupos/.usuarios.
     NOT frozen -- grows new attributes in Phases 2-3.
     """
 
     journal: ContaPlusJournal | None = None
+    subcta: SubctaTable | None = None    # D-05: present when SUBCTA.DBF found
+    empresa: GenericTable | None = None  # D-05: present when empresa.dbf found
+    grupos: GenericTable | None = None   # D-05: present when grupos.dbf found
+    usuarios: GenericTable | None = None  # D-05: present when usuarios.dbf found
