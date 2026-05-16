@@ -10,11 +10,11 @@ Requirements for the initial release. Each maps to roadmap phases.
 ### Input Handling
 
 - [ ] **INPUT-01**: Reader accepts a raw `.dbf` file as bytes or a file-like object (no filesystem path required)
-- [ ] **INPUT-02**: Reader accepts a ContaPlus backup `.zip` as bytes or a file-like object
+- [x] **INPUT-02**: Reader accepts a ContaPlus backup `.zip` as bytes or a file-like object
 - [x] **INPUT-03**: Reader sniffs the input type and rejects unsupported inputs with a structured error
-- [ ] **INPUT-04**: ZIP extraction works from an in-memory buffer and is zip-slip-safe (rejects path-traversal entries)
-- [ ] **INPUT-05**: Reader recursively locates ContaPlus tables inside a backup ZIP regardless of nesting depth
-- [ ] **INPUT-06**: Multi-company ZIP is disambiguated by a caller-supplied company selector; ambiguous or missing selection fails listing the available company names
+- [x] **INPUT-04**: ZIP extraction works from an in-memory buffer and is zip-slip-safe (rejects path-traversal entries)
+- [x] **INPUT-05**: Reader recursively locates ContaPlus tables inside a backup ZIP regardless of nesting depth
+- [x] **INPUT-06**: Multi-company ZIP is disambiguated by a caller-supplied company selector; ambiguous or missing selection fails listing the available company names
 
 ### Journal Reader (`DIARIO.DBF`)
 
@@ -24,8 +24,8 @@ Requirements for the initial release. Each maps to roadmap phases.
 
 ### Other Table Readers
 
-- [ ] **TABL-01**: Typed reader for `SUBCTA.DBF` (chart of subaccounts) with defensive field-name resolution (`CODIGO`/`COD`, `DESCRIP`/`TITULO`, `NIF`/`CIF`)
-- [ ] **TABL-02**: Typed readers for the group-level tables (`grupos.dbf`, `usuarios.dbf`, `empresa.dbf`)
+- [x] **TABL-01**: Typed reader for `SUBCTA.DBF` (chart of subaccounts) with defensive field-name resolution (`CODIGO`/`COD`, `DESCRIP`/`TITULO`, `NIF`/`CIF`)
+- [x] **TABL-02**: Typed readers for the group-level tables (`grupos.dbf`, `usuarios.dbf`, `empresa.dbf`)
 - [ ] **TABL-03**: Typed readers for the operational tables (`venci.dbf`, `prede.dbf`, `amoinv.dbf`, `nivel.dbf`), with field schemas validated against real `pii-test-data/` archives before implementation
 - [ ] **TABL-04**: Reader extracts every recognized table from a backup ZIP in a single pass
 
@@ -40,7 +40,7 @@ Requirements for the initial release. Each maps to roadmap phases.
 - [x] **API-02**: Strict read path fails loudly on invalid data, raising `ContaPlusReadError` with row/column/context
 - [ ] **API-03**: Lenient conversion path extracts all readable data, collects problems into a report, and never aborts the whole file
 - [ ] **API-04**: Library returns self-contained result types (`ContaPlusJournal` and per-table siblings) with no `tw-domain` dependency
-- [ ] **API-05**: Journal result is enriched with account/subaccount names when `SUBCTA.DBF` is present in the input
+- [x] **API-05**: Journal result is enriched with account/subaccount names when `SUBCTA.DBF` is present in the input
 
 ### XLSX Rendering
 
@@ -52,7 +52,7 @@ Requirements for the initial release. Each maps to roadmap phases.
 ### CLI (`contaplus2xlsx`)
 
 - [x] **CLI-01**: `contaplus2xlsx` converts a single `.dbf`/`.zip` file to a styled `.xlsx`
-- [ ] **CLI-02**: CLI selects a company in a multi-company backup via a flag
+- [x] **CLI-02**: CLI selects a company in a multi-company backup via a flag
 - [ ] **CLI-03**: CLI reports row counts, skipped-memo count, and any problems to stdout
 - [x] **CLI-04**: CLI is installable and runnable via `uvx` / `pipx`
 
@@ -106,16 +106,16 @@ Which phases cover which requirements.
 | Requirement | Phase | Status |
 |-------------|-------|--------|
 | INPUT-01 | Phase 1 | Pending |
-| INPUT-02 | Phase 2 | Pending |
+| INPUT-02 | Phase 2 | Complete |
 | INPUT-03 | Phase 1 | Complete |
-| INPUT-04 | Phase 2 | Pending |
-| INPUT-05 | Phase 2 | Pending |
-| INPUT-06 | Phase 2 | Pending |
+| INPUT-04 | Phase 2 | Complete |
+| INPUT-05 | Phase 2 | Complete |
+| INPUT-06 | Phase 2 | Complete |
 | JRNL-01 | Phase 1 | Pending |
 | JRNL-02 | Phase 1 | Pending |
 | JRNL-03 | Phase 1 | Complete |
-| TABL-01 | Phase 2 | Pending |
-| TABL-02 | Phase 2 | Pending |
+| TABL-01 | Phase 2 | Complete |
+| TABL-02 | Phase 2 | Complete |
 | TABL-03 | Phase 3 | Pending |
 | TABL-04 | Phase 3 | Pending |
 | BAL-01 | Phase 3 | Pending |
@@ -124,13 +124,13 @@ Which phases cover which requirements.
 | API-02 | Phase 1 | Complete |
 | API-03 | Phase 3 | Pending |
 | API-04 | Phase 1 | Pending |
-| API-05 | Phase 2 | Pending |
+| API-05 | Phase 2 | Complete |
 | XLSX-01 | Phase 1 | Complete |
 | XLSX-02 | Phase 3 | Pending |
 | XLSX-03 | Phase 3 | Pending |
 | XLSX-04 | Phase 1 | Complete |
 | CLI-01 | Phase 1 | Complete |
-| CLI-02 | Phase 4 | Pending |
+| CLI-02 | Phase 4 | Complete |
 | CLI-03 | Phase 4 | Pending |
 | CLI-04 | Phase 1 | Complete |
 | PWA-01 | Phase 5 | Pending |
