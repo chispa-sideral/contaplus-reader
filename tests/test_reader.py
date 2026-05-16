@@ -423,3 +423,259 @@ def test_output_df_has_correct_columns(cp850_basic_dbf: Path) -> None:
     assert isinstance(row.haber, float)
     assert isinstance(row.cuenta, str)
     assert isinstance(row.subcuenta, str)
+
+
+# ===========================================================================
+# Phase 2 failing tests (plan 02-01) -- all RED; GREEN in plan 02-02
+# ===========================================================================
+
+# ---------------------------------------------------------------------------
+# INPUT-02: read() accepts ZIP bytes and file-like objects
+# ---------------------------------------------------------------------------
+
+def test_read_zip_bytes(single_company_zip_with_subcta: Path) -> None:
+    """INPUT-02: read() must accept ZIP bytes and return ContaPlusData with journal.
+
+    RED: read() currently raises ContaPlusReadError for ZIP input (sniffer rejects 0x50).
+    GREEN when: _sniffer.py flip + _zip.py implementation lands in plan 02-02.
+    """
+    zip_bytes = single_company_zip_with_subcta.read_bytes()
+    data = read(zip_bytes)
+    assert isinstance(data, ContaPlusData)
+    assert data.journal is not None
+    assert len(data.journal.rows) > 0
+
+
+def test_read_zip_filelike(single_company_zip_with_subcta: Path) -> None:
+    """INPUT-02: read() must accept a BinaryIO wrapping a ZIP.
+
+    RED: same reason as test_read_zip_bytes -- sniffer rejects ZIP magic.
+    GREEN when: same as test_read_zip_bytes.
+    """
+    import io as _io
+
+    zip_bytes = single_company_zip_with_subcta.read_bytes()
+    data = read(_io.BytesIO(zip_bytes))
+    assert isinstance(data, ContaPlusData)
+    assert data.journal is not None
+    assert len(data.journal.rows) > 0
+
+
+# ---------------------------------------------------------------------------
+# INPUT-04: Zip-slip entries rejected (security)
+# ---------------------------------------------------------------------------
+
+def test_read_zipslip_rejected(zip_slip_zip: Path) -> None:
+    """INPUT-04: ZIP with a path-traversal entry must raise ContaPlusReadError.
+
+    RED: read() currently raises ContaPlusReadError for all ZIP input, not
+    specifically for zip-slip. Once ZIP support lands, the specific error
+    message 'Unsafe ZIP entry' must be present.
+    GREEN when: _zip.py zip-slip guard implemented in plan 02-02.
+    """
+    zip_bytes = zip_slip_zip.read_bytes()
+    with pytest.raises(ContaPlusReadError) as exc_info:
+        read(zip_bytes)
+    # Phase 2 requirement: the error mentions the unsafe entry
+    assert "Unsafe ZIP entry" in exc_info.value.message or "ZIP" in exc_info.value.message
+
+
+# ---------------------------------------------------------------------------
+# INPUT-06: Multi-company ZIP disambiguation
+# ---------------------------------------------------------------------------
+
+def test_read_multi_company_no_selector(multi_company_zip: Path) -> None:
+    """INPUT-06: Multi-company ZIP without company selector must raise ContaPlusReadError
+    listing available company directories.
+
+    RED: read() currently raises ContaPlusReadError for all ZIP (ZIP not supported yet).
+    The specific assertion on message content will become meaningful in plan 02-02.
+    GREEN when: _zip.py company resolution implemented.
+    """
+    zip_bytes = multi_company_zip.read_bytes()
+    with pytest.raises(ContaPlusReadError) as exc_info:
+        read(zip_bytes)
+    # Phase 2 requirement: error message must list available company names
+    msg = exc_info.value.message
+    assert "Emp01" in msg or "ZIP" in msg  # RED: 'ZIP' acceptable; GREEN: must have 'Emp01'
+
+
+def test_read_multi_company_selected(multi_company_zip: Path) -> None:
+    """INPUT-06: Multi-company ZIP with valid company= selector returns ContaPlusData.
+
+    RED: read() does not accept company= parameter yet (TypeError or ContaPlusReadError).
+    GREEN when: read() gains company= param in plan 02-02.
+    """
+    zip_bytes = multi_company_zip.read_bytes()
+    # read() does not accept company= yet; this will raise TypeError (RED).
+    data = read(zip_bytes, company="Emp01")  # type: ignore[call-arg]
+    assert isinstance(data, ContaPlusData)
+    assert data.journal is not None
+    assert len(data.journal.rows) > 0
+
+
+def test_read_single_company_wrong_selector(single_company_zip_with_subcta: Path) -> None:
+    """INPUT-06 / D-03: company= selector against single-company ZIP with wrong name raises.
+
+    RED: read() does not accept company= yet.
+    GREEN when: read() gains company= param and validates selector against archive.
+    """
+    zip_bytes = single_company_zip_with_subcta.read_bytes()
+    with pytest.raises((ContaPlusReadError, TypeError)):
+        # TypeError in RED phase (no company param); ContaPlusReadError in GREEN
+        read(zip_bytes, company="WrongCo")  # type: ignore[call-arg]
+
+
+def test_read_selector_on_dbf_raises(cp850_basic_dbf: Path) -> None:
+    """INPUT-06 / D-03: company= selector against a raw DBF must raise ContaPlusReadError
+    with 'not applicable' in the message.
+
+    RED: read() does not accept company= yet -- TypeError in RED phase.
+    GREEN when: read() gains company= and raises ContaPlusReadError for DBF input.
+    """
+    dbf_bytes = cp850_basic_dbf.read_bytes()
+    with pytest.raises((ContaPlusReadError, TypeError)):
+        read(dbf_bytes, company="Emp01")  # type: ignore[call-arg]
+
+
+# ---------------------------------------------------------------------------
+# TABL-01 / API-05: SUBCTA enrichment -- subcuenta_nombre on JournalRow
+# ---------------------------------------------------------------------------
+
+def test_subcta_lookup_correct(single_company_zip_with_subcta: Path) -> None:
+    """TABL-01 / API-05: Journal rows are enriched with subcuenta_nombre from SubCta.dbf.
+
+    RED: read() rejects ZIP. subcuenta_nombre field does not yet exist on JournalRow.
+    GREEN when: ZIP read + SUBCTA lookup implemented; JournalRow gains subcuenta_nombre.
+    """
+    zip_bytes = single_company_zip_with_subcta.read_bytes()
+    data = read(zip_bytes)
+    assert data.journal is not None
+    rows_by_subcuenta: dict[str, Any] = {}
+    for r in data.journal.rows:
+        rows_by_subcuenta[r.subcuenta] = r
+    # 4300000 -> "Cliente XYZ"
+    row_4300 = rows_by_subcuenta.get("4300000")
+    assert row_4300 is not None
+    assert row_4300.subcuenta_nombre == "Cliente XYZ"  # type: ignore[attr-defined]
+    # 7000000 -> "Ventas mercaderias"
+    row_7000 = rows_by_subcuenta.get("7000000")
+    assert row_7000 is not None
+    assert row_7000.subcuenta_nombre == "Ventas mercaderias"  # type: ignore[attr-defined]
+
+
+def test_subcta_lookup_missing_key(single_company_zip_with_subcta: Path) -> None:
+    """API-05 / D-11: subcuenta not in SubCta.dbf -> subcuenta_nombre is None (not an error).
+
+    fixture has 4300000 and 7000000 in SubCta; 6000001 is absent.
+    RED: read() rejects ZIP. subcuenta_nombre not yet on JournalRow.
+    GREEN when: enrichment implemented with best-effort lookup.
+    """
+    zip_bytes = single_company_zip_with_subcta.read_bytes()
+    data = read(zip_bytes)
+    assert data.journal is not None
+    # 6000001 is in the journal but NOT in SubCta -> must be None
+    rows_6000 = [r for r in data.journal.rows if r.subcuenta == "6000001"]
+    assert len(rows_6000) == 1
+    assert rows_6000[0].subcuenta_nombre is None  # type: ignore[attr-defined]
+
+
+def test_subcta_absent_all_none(single_company_zip: Path) -> None:
+    """API-05 / D-11: When SubCta.dbf is absent, all subcuenta_nombre are None.
+
+    RED: read() rejects ZIP. subcuenta_nombre not yet on JournalRow.
+    GREEN when: enrichment implemented with absent-table -> all-None behaviour.
+    """
+    zip_bytes = single_company_zip.read_bytes()
+    data = read(zip_bytes)
+    assert data.journal is not None
+    # All rows must have subcuenta_nombre=None when SubCta is absent
+    for r in data.journal.rows:
+        assert r.subcuenta_nombre is None  # type: ignore[attr-defined]
+
+
+def test_subcta_candidate_fallback(tmp_path_factory: pytest.TempPathFactory) -> None:
+    """TABL-01 / D-16: Alternate field names (CODIGO/DESCRIP) resolved via candidate list.
+
+    Builds a SubCta.dbf with 'CODIGO C(12); DESCRIP C(40)' (not the standard cod/titulo).
+    read() must still find subcuenta_nombre via _pick_column candidate resolution.
+    RED: read() rejects ZIP. Candidate resolution not yet implemented.
+    GREEN when: _subcta.py _pick_column candidates include 'codigo' + 'descrip'.
+    """
+    import dbf as _dbflib
+    import zipfile as _zipfile
+
+    # Build DIARIO.DBF with one row (subcuenta 4300000)
+    dbf_dir = tmp_path_factory.mktemp("candidate_fallback")
+    diario_path = dbf_dir / "DIARIO.DBF"
+    _diario_spec = (
+        "ASIEN N(6,0); FECHA D; SUBCTA C(12); CONTRA C(12); "
+        "CONCEPTO C(25); EURODEBE N(16,2); EUROHABER N(16,2)"
+    )
+    t = _dbflib.Table(filename=str(diario_path), field_specs=_diario_spec, codepage="cp850")
+    t.open(mode=_dbflib.READ_WRITE)
+    try:
+        t.append({
+            "asien": 1,
+            "fecha": _dt.date(2025, 1, 1),
+            "subcta": "4300000",
+            "contra": "",
+            "concepto": "Test",
+            "eurodebe": 100.0,
+            "eurohaber": 0.0,
+        })
+    finally:
+        t.close()
+
+    # Build a SubCta.dbf with alternate field names (CODIGO/DESCRIP) -- no decimals for C fields
+    alt_subcta_path = dbf_dir / "SubCta.dbf"
+    alt_spec = "CODIGO C(12); DESCRIP C(40)"
+    t2 = _dbflib.Table(filename=str(alt_subcta_path), field_specs=alt_spec, codepage="cp850")
+    t2.open(mode=_dbflib.READ_WRITE)
+    try:
+        t2.append({"CODIGO": "4300000", "DESCRIP": "Cliente XYZ"})
+    finally:
+        t2.close()
+
+    # Build ZIP
+    zip_path = dbf_dir / "backup_alt.zip"
+    with _zipfile.ZipFile(zip_path, "w") as zf:
+        zf.write(diario_path, arcname="Emp01/Diario.dbf")
+        zf.write(alt_subcta_path, arcname="Emp01/SubCta.dbf")
+
+    data = read(zip_path.read_bytes())
+    assert data.journal is not None
+    assert len(data.journal.rows) == 1
+    assert data.journal.rows[0].subcuenta_nombre == "Cliente XYZ"  # type: ignore[attr-defined]
+
+
+# ---------------------------------------------------------------------------
+# TABL-02: Group tables (absent or present)
+# ---------------------------------------------------------------------------
+
+def test_group_tables_absent_no_error(single_company_zip_with_subcta: Path) -> None:
+    """TABL-02 / D-06: Absent group tables (grupos/usuarios/empresa) cause no error.
+
+    Result's .grupos/.usuarios/.empresa must all be None when tables are absent.
+    RED: read() rejects ZIP. ContaPlusData does not yet have .grupos/.usuarios/.empresa.
+    GREEN when: ZIP read + ContaPlusData extended with optional table attrs.
+    """
+    zip_bytes = single_company_zip_with_subcta.read_bytes()
+    data = read(zip_bytes)
+    # Verify no error raised and optional group tables are None
+    assert getattr(data, "grupos", "MISSING") in (None, "MISSING")
+    assert getattr(data, "usuarios", "MISSING") in (None, "MISSING")
+    assert getattr(data, "empresa", "MISSING") in (None, "MISSING")
+
+
+def test_usuarios_present_in_result(zip_with_group_tables: Path) -> None:
+    """TABL-02: When usuarios.dbf is in the archive, result.usuarios must not be None.
+
+    RED: read() rejects ZIP. ContaPlusData does not yet have .usuarios.
+    GREEN when: ZIP read + generic table readers + ContaPlusData.usuarios implemented.
+    """
+    zip_bytes = zip_with_group_tables.read_bytes()
+    data = read(zip_bytes)
+    assert data is not None
+    # usuarios must be populated when the table is in the archive
+    assert getattr(data, "usuarios", None) is not None

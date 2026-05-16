@@ -325,3 +325,88 @@ def test_data_values_round_trip() -> None:
     assert ws.cell(row=2, column=4).value == 1500.75  # type: ignore[union-attr]
     assert ws.cell(row=2, column=5).value == 0.0  # type: ignore[union-attr]
     assert ws.cell(row=2, column=6).value == "Invoice payment"  # type: ignore[union-attr]
+
+
+# ===========================================================================
+# Phase 2 failing tests (plan 02-01) -- all RED; GREEN in plan 02-03
+# ===========================================================================
+
+# ---------------------------------------------------------------------------
+# D-12 / D-14: Multi-sheet workbook
+# ---------------------------------------------------------------------------
+
+@pytest.mark.xfail(strict=False, reason="Phase 2: render() multi-sheet function not yet implemented")
+def test_render_multi_sheet_names() -> None:
+    """D-12 / D-14: render(data) must produce a workbook with 'Diario' and 'Subcuentas' sheets.
+
+    RED: render() does not exist yet. render_journal() only produces a single 'Diario' sheet.
+    GREEN when: xlsx.py gains render(data: ContaPlusData) -> bytes with multi-sheet support.
+    """
+    from contaplus_reader.models import ContaPlusData, SubctaTable  # type: ignore[attr-defined]
+
+    # Import render() inside body so ImportError is a test failure, not collection failure
+    try:
+        from contaplus_reader.xlsx import render
+    except ImportError:
+        pytest.fail("render() not yet importable from contaplus_reader.xlsx")
+
+    row = _sample_row()
+    journal = _make_journal(row)
+
+    # Build a minimal SubctaTable (or mock) -- may not exist yet
+    try:
+        subcta = SubctaTable(rows=(), source_name=None)  # type: ignore[call-arg]
+    except Exception:
+        subcta = object()  # type: ignore[assignment]
+
+    data = ContaPlusData(journal=journal, subcta=subcta)  # type: ignore[call-arg]
+    result = render(data)
+    wb = load_workbook(io.BytesIO(result))
+    sheet_names = wb.sheetnames
+    assert "Diario" in sheet_names, f"Expected 'Diario' sheet, got: {sheet_names}"
+    assert "Subcuentas" in sheet_names, f"Expected 'Subcuentas' sheet, got: {sheet_names}"
+
+
+@pytest.mark.xfail(strict=False, reason="Phase 2: Descripción column and render() not yet implemented")
+def test_render_descripcion_column_present() -> None:
+    """D-15: Diario sheet must have 'Descripción' header after 'Subcuenta', with values.
+
+    RED: render() does not exist. render_journal() HEADERS has no Descripción column.
+    GREEN when: xlsx.py gains render() + HEADERS includes 'Descripción' at position 4
+    and journal rows write subcuenta_nombre value there.
+    """
+    # Import render() inside body so ImportError is a test failure, not collection failure
+    try:
+        from contaplus_reader.xlsx import render
+    except ImportError:
+        pytest.fail("render() not yet importable from contaplus_reader.xlsx")
+
+    from contaplus_reader.models import ContaPlusData
+
+    row = JournalRow(
+        fecha=datetime.date(2025, 1, 1),
+        cuenta="4300",
+        subcuenta="4300000",
+        debe=100.0,
+        haber=0.0,
+        concepto="Test",
+        subcuenta_nombre="Cliente XYZ",  # type: ignore[call-arg]
+    )
+    journal = _make_journal(row)
+    data = ContaPlusData(journal=journal)
+    result = render(data)
+    wb = load_workbook(io.BytesIO(result))
+    ws = wb["Diario"]
+
+    # Find the Descripción column by scanning row 1 headers
+    header_row = [ws.cell(row=1, column=c).value for c in range(1, 10)]
+    assert "Descripción" in header_row, (
+        f"Expected 'Descripción' in Diario headers, got: {header_row}"
+    )
+    descripcion_col = header_row.index("Descripción") + 1  # 1-based
+
+    # Row 2 must have the subcuenta_nombre value
+    cell_value = ws.cell(row=2, column=descripcion_col).value
+    assert cell_value == "Cliente XYZ", (
+        f"Expected 'Cliente XYZ' in Descripción column, got: {cell_value!r}"
+    )

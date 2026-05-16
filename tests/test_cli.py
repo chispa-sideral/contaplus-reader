@@ -178,3 +178,57 @@ def test_cli_help_shows_force_option() -> None:
     assert result.exit_code == 0
     assert "--force" in result.output
     assert "--overwrite" in result.output
+
+
+# ===========================================================================
+# Phase 2 failing tests (plan 02-01) -- all RED; GREEN in plan 02-03
+# ===========================================================================
+
+# ---------------------------------------------------------------------------
+# CLI-02: --company flag
+# ---------------------------------------------------------------------------
+
+@pytest.mark.xfail(strict=False, reason="Phase 2: --company flag not yet implemented")
+def test_cli_company_flag_accepted(
+    tmp_path: Path,
+    single_company_zip_with_subcta: Path,
+) -> None:
+    """CLI-02: --company flag must be accepted and passed to read().
+
+    RED: --company option does not exist on the CLI yet (typer unknown option error).
+    GREEN when: cli.py gains --company Annotated[str | None, typer.Option()] parameter.
+    """
+    out = tmp_path / "out.xlsx"
+    result = runner.invoke(
+        app, [str(single_company_zip_with_subcta), str(out), "--company", "Emp01"]
+    )
+    # Verify the option is accepted (not rejected as unknown)
+    assert "--company" not in (result.output or ""), (
+        "--company was reported as unknown option -- not yet implemented"
+    )
+    assert result.exit_code == 0, (
+        f"Expected exit 0 with valid --company, got {result.exit_code}. Output: {result.output}"
+    )
+    assert out.exists()
+
+
+@pytest.mark.xfail(strict=False, reason="Phase 2: ZIP reading and --company flag not yet implemented")
+def test_cli_multi_company_no_flag_exits_1(
+    tmp_path: Path,
+    multi_company_zip: Path,
+) -> None:
+    """CLI-02 / D-08: Multi-company ZIP without --company exits 1 with Rich error panel.
+
+    RED: CLI currently raises ContaPlusReadError for all ZIP (sniffer rejection),
+    which DOES exit 1 -- but for the wrong reason. Once ZIP support lands,
+    the error panel must list available company names ('Emp01', 'Emp02').
+    GREEN when: ZIP read implemented and multi-company error surfaced via Rich panel.
+    """
+    out = tmp_path / "out.xlsx"
+    result = runner.invoke(app, [str(multi_company_zip), str(out)])
+    assert result.exit_code == 1
+    # Phase 2 requirement: error output mentions available company names
+    combined = result.output + (result.stderr if hasattr(result, "stderr") and result.stderr else "")
+    assert "Emp01" in combined, (
+        f"Expected 'Emp01' in error output for multi-company ZIP, got: {combined!r}"
+    )

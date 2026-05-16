@@ -47,10 +47,11 @@ _DIARIO_SPEC = (
 # Phase 2 DBF specs (RESEARCH.md §SUBCTA Schema + §Critical Finding):
 # SUBCTA schema is VERIFIED across all real archives (cod/titulo).
 # Group table schemas are [ASSUMED] -- no real archives contain these files.
-_SUBCTA_SPEC = "cod C(12,0); titulo C(40,0); nif C(15,0)"
-_GRUPOS_SPEC = "COD C(10,0); DESCRIP C(40,0)"
-_USUARIOS_SPEC = "CODIGO C(10,0); NOMBRE C(40,0); CLAVE C(20,0)"
-_EMPRESA_SPEC = "CODIGO C(10,0); NOMBRE C(60,0); NIF C(15,0)"
+# Note: dbf (ethanfurman) uses C(n) not C(n,0) for character fields.
+_SUBCTA_SPEC = "cod C(12); titulo C(40); nif C(15)"
+_GRUPOS_SPEC = "COD C(10); DESCRIP C(40)"
+_USUARIOS_SPEC = "CODIGO C(10); NOMBRE C(40); CLAVE C(20)"
+_EMPRESA_SPEC = "CODIGO C(10); NOMBRE C(60); NIF C(15)"
 
 
 def _build_diario_dbf(
