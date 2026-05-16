@@ -48,8 +48,12 @@ def test_read_accepts_binary_io(cp850_basic_dbf: Path) -> None:
     assert len(data.journal.rows) == 3
 
 
-def test_non_seekable_binary_io_raises_structured_error(cp850_basic_dbf: Path) -> None:
-    """CR-01: A non-seekable BinaryIO stream raises ContaPlusReadError, not bare OSError."""
+def test_non_seekable_binary_io_accepted(cp850_basic_dbf: Path) -> None:
+    """CR-01: A non-seekable BinaryIO stream is accepted (read() normalises to bytes first).
+
+    Phase 2: read() calls data.read() once before sniffing, so seekability is
+    no longer required. Non-seekable streams work as long as .read() returns bytes.
+    """
     import io as _io
 
     class NonSeekableStream(_io.RawIOBase):
@@ -69,10 +73,11 @@ def test_non_seekable_binary_io_raises_structured_error(cp850_basic_dbf: Path) -
             raise OSError("Illegal seek")
 
     stream = NonSeekableStream(cp850_basic_dbf.read_bytes())
-    with pytest.raises(ContaPlusReadError) as exc_info:
-        read(stream)
-    # Must raise ContaPlusReadError, not propagate raw OSError
-    assert "seekable" in exc_info.value.message.lower() or "not seekable" in exc_info.value.message.lower()
+    # Phase 2: non-seekable stream is now accepted -- bytes normalised first
+    result = read(stream)
+    assert isinstance(result, ContaPlusData)
+    assert result.journal is not None
+    assert len(result.journal.rows) == 3
 
 
 # ---------------------------------------------------------------------------

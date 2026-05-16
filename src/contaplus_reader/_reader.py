@@ -99,6 +99,7 @@ def _read_dbf_path(
     path: Path,
     *,
     source_name: str | None = None,
+    subcta_lookup: dict[str, str | None] | None = None,
 ) -> ContaPlusJournal:
     """Read a DIARIO.DBF at the given path and return a validated ContaPlusJournal.
 
@@ -111,10 +112,13 @@ def _read_dbf_path(
       D-C1: negative amounts pass through (sign preserved)
       D-D1: encoding=cp850 unconditionally
       D-E2: lowernames=True, ignore_missing_memofile=True
+      D-09: subcuenta_nombre populated from subcta_lookup if provided
 
     Args:
         path: Path to a .dbf file (may be a temp file from bytes_to_tmppath).
         source_name: Optional provenance label for the resulting journal.
+        subcta_lookup: Optional dict mapping subcuenta codes -> names (D-09/D-11).
+                       If None, all subcuenta_nombre will be None.
 
     Returns:
         ContaPlusJournal with validated rows.
@@ -192,6 +196,11 @@ def _read_dbf_path(
             )
             concepto: str | None = concepto_str if concepto_str else None
 
+            # D-09/D-10/D-11: subcuenta-level enrichment; best-effort
+            subcuenta_nombre: str | None = None
+            if subcta_lookup is not None:
+                subcuenta_nombre = subcta_lookup.get(subcuenta)  # None if key absent
+
             rows.append(
                 JournalRow(
                     fecha=fecha_raw,
@@ -200,6 +209,7 @@ def _read_dbf_path(
                     debe=debe,
                     haber=haber,
                     concepto=concepto,
+                    subcuenta_nombre=subcuenta_nombre,  # D-09
                 )
             )
 
