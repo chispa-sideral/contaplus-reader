@@ -1,10 +1,11 @@
 ---
 phase: 2
 slug: zip-subaccounts
-status: draft
+status: validated
 nyquist_compliant: true
-wave_0_complete: false
+wave_0_complete: true
 created: 2026-05-16
+last_validated: 2026-05-17
 ---
 
 # Phase 2 — Validation Strategy
@@ -21,9 +22,10 @@ created: 2026-05-16
 | **Config file** | `pyproject.toml` `[tool.pytest.ini_options]` |
 | **Quick run command** | `uv run pytest -q` |
 | **Full suite command** | `uv run pytest` |
-| **Estimated runtime** | ~5 seconds (55 baseline + ~19 new tests) |
+| **Estimated runtime** | ~1.3 seconds (81 tests; measured 1.24s) |
 
 **Baseline:** 55 tests pass in ~0.80s. [VERIFIED: live test run before Phase 2]
+**Post-execution:** 81 tests pass in 1.24s. [VERIFIED: live test run 2026-05-17]
 
 ---
 
@@ -40,12 +42,12 @@ created: 2026-05-16
 
 | Task ID | Plan | Wave | Requirement | Threat Ref | Secure Behavior | Test Type | Automated Command | File Exists | Status |
 |---------|------|------|-------------|------------|-----------------|-----------|-------------------|-------------|--------|
-| 02-01-01 | 01 | 1 | INPUT-02, INPUT-04, INPUT-05, INPUT-06, TABL-01, TABL-02, API-05 | — | No real ContaPlus data committed; all fixtures synthetic | fixture | `cd C:/dev/contaplus-reader && uv run pytest --collect-only -q 2>&1 \| tail -5` | ❌ Wave 0 | ⬜ pending |
-| 02-01-02 | 01 | 1 | INPUT-02, INPUT-04, INPUT-05, INPUT-06, TABL-01, TABL-02, API-05, CLI-02 | T-02-SC | Tests confirm zip-slip rejected before extraction | unit (RED) | `cd C:/dev/contaplus-reader && uv run pytest -q 2>&1 \| tail -20` | ❌ Wave 0 | ⬜ pending |
-| 02-02-01 | 02 | 2 | INPUT-02, INPUT-04, INPUT-05, INPUT-06, TABL-01, TABL-02, API-05 | T-02-01, T-02-02 | ZIP-slip guard runs per-entry before extraction; malformed DBF wrapped in ContaPlusReadError | unit | `cd C:/dev/contaplus-reader && uv run pytest tests/test_reader.py -k "not zip" -q 2>&1 \| tail -10` | ❌ Wave 0 | ⬜ pending |
-| 02-02-02 | 02 | 2 | INPUT-02, INPUT-04, INPUT-05, INPUT-06, TABL-01, TABL-02, API-05 | T-02-01, T-02-02 | All reader/SUBCTA/group-table tests GREEN | unit | `cd C:/dev/contaplus-reader && uv run pytest tests/test_reader.py -q 2>&1 \| tail -20` | ❌ Wave 0 | ⬜ pending |
-| 02-03-01 | 03 | 3 | INPUT-02, INPUT-06, TABL-01, TABL-02, API-05 | T-02-04, T-02-05 | openpyxl writes literal values only; no formula injection | unit | `cd C:/dev/contaplus-reader && uv run pytest tests/test_xlsx.py -q 2>&1 \| tail -15` | ❌ Wave 0 | ⬜ pending |
-| 02-03-02 | 03 | 3 | INPUT-02, INPUT-06, CLI-02 | — | --company flag passed to read(); multi-company error surfaces via Rich panel | unit | `cd C:/dev/contaplus-reader && uv run pytest tests/test_cli.py -q 2>&1 \| tail -15` | ❌ Wave 0 | ⬜ pending |
+| 02-01-01 | 01 | 1 | INPUT-02, INPUT-04, INPUT-05, INPUT-06, TABL-01, TABL-02, API-05 | — | No real ContaPlus data committed; all fixtures synthetic | fixture | `cd C:/dev/contaplus-reader && uv run pytest --collect-only -q 2>&1 \| tail -5` | ✅ exists | ✅ green |
+| 02-01-02 | 01 | 1 | INPUT-02, INPUT-04, INPUT-05, INPUT-06, TABL-01, TABL-02, API-05, CLI-02 | T-02-SC | Tests confirm zip-slip rejected before extraction | unit (RED) | `cd C:/dev/contaplus-reader && uv run pytest -q 2>&1 \| tail -20` | ✅ exists | ✅ green |
+| 02-02-01 | 02 | 2 | INPUT-02, INPUT-04, INPUT-05, INPUT-06, TABL-01, TABL-02, API-05 | T-02-01, T-02-02 | ZIP-slip guard runs per-entry before extraction; malformed DBF wrapped in ContaPlusReadError | unit | `cd C:/dev/contaplus-reader && uv run pytest tests/test_reader.py -k "not zip" -q 2>&1 \| tail -10` | ✅ exists | ✅ green |
+| 02-02-02 | 02 | 2 | INPUT-02, INPUT-04, INPUT-05, INPUT-06, TABL-01, TABL-02, API-05 | T-02-01, T-02-02 | All reader/SUBCTA/group-table tests GREEN | unit | `cd C:/dev/contaplus-reader && uv run pytest tests/test_reader.py -q 2>&1 \| tail -20` | ✅ exists | ✅ green |
+| 02-03-01 | 03 | 3 | INPUT-02, INPUT-06, TABL-01, TABL-02, API-05 | T-02-04, T-02-05 | openpyxl writes literal values only; no formula injection | unit | `cd C:/dev/contaplus-reader && uv run pytest tests/test_xlsx.py -q 2>&1 \| tail -15` | ✅ exists | ✅ green |
+| 02-03-02 | 03 | 3 | INPUT-02, INPUT-06, CLI-02 | — | --company flag passed to read(); multi-company error surfaces via Rich panel | unit | `cd C:/dev/contaplus-reader && uv run pytest tests/test_cli.py -q 2>&1 \| tail -15` | ✅ exists | ✅ green |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
 
@@ -53,10 +55,10 @@ created: 2026-05-16
 
 ## Wave 0 Requirements
 
-- [ ] `tests/conftest.py` — add `single_company_zip_with_subcta`, `single_company_zip`, `multi_company_zip`, `zip_with_group_tables`, `zip_slip_zip`, `_build_subcta_dbf`, `_build_generic_dbf`
-- [ ] `tests/test_reader.py` — 13 failing tests for ZIP reading, zip-slip, company resolution, SUBCTA enrichment, group table handling
-- [ ] `tests/test_cli.py` — 2 failing tests for `--company` flag and multi-company error panel
-- [ ] `tests/test_xlsx.py` — 2 failing tests for multi-sheet workbook and Descripción column
+- [x] `tests/conftest.py` — added `single_company_zip_with_subcta`, `single_company_zip`, `multi_company_zip`, `zip_with_group_tables`, `zip_slip_zip`, `_build_subcta_dbf`, `_build_generic_dbf`
+- [x] `tests/test_reader.py` — ZIP reading, zip-slip, company resolution, SUBCTA enrichment, group table handling tests (all GREEN)
+- [x] `tests/test_cli.py` — `--company` flag and multi-company error panel tests (all GREEN)
+- [x] `tests/test_xlsx.py` — multi-sheet workbook and Descripción column tests (all GREEN)
 
 ---
 
@@ -116,3 +118,19 @@ created: 2026-05-16
 - [x] `nyquist_compliant: true` set in frontmatter
 
 **Approval:** pending
+
+---
+
+## Validation Audit 2026-05-17
+
+| Metric | Count |
+|--------|-------|
+| Gaps found | 0 |
+| Resolved | 0 |
+| Escalated | 0 |
+
+**State A audit** (existing VALIDATION.md). All 6 tasks across plans 02-01/02/03 cross-referenced against the live test suite. Every one of the 19 mapped requirement→test entries exists, targets the intended behavior, and runs green. Full suite: **81 passed in 1.24s** — 0 failed, 0 xfail, 0 skip.
+
+6 tests exist beyond the original map, strengthening coverage: `test_read_zipslip_backslash_rejected`, `test_read_zipslip_absolute_rejected`, `test_subcta_lookup_whitespace_padded_cod_matches`, `test_subcta_numeric_cod_field_no_crash`, `test_subcta_sheet_headers_from_schema_not_row0`, `test_subcta_sheet_empty_table_has_header_row`.
+
+**Verdict:** Phase 2 is Nyquist-compliant. Every requirement has automated verification; no gaps to fill.
