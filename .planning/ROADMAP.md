@@ -18,7 +18,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 
 - [x] **Phase 1: Journal Slice** - Thin working vertical: bytes → DIARIO.DBF reader → XLSX → CLI (completed 2026-05-15)
 - [x] **Phase 2: ZIP & Subaccounts** - ZIP input, SUBCTA reader, journal name enrichment, group-level tables (completed 2026-05-16)
-- [ ] **Phase 3: Full Tables, Balance & Lenient Path** - Operational-table readers, trial-balance computation, lenient conversion path, XLSX report sheet
+- [x] **Phase 3: Full Tables, Balance & Lenient Path** - Operational-table readers, trial-balance computation, lenient conversion path, XLSX report sheet (completed 2026-05-17)
 - [ ] **Phase 4: Full CLI & PyPI Publication** - Multi-company flag, stdout reporting, wheel published to PyPI
 - [ ] **Phase 5: Browser PWA** - Pyodide spike then full client-side PWA on Cloudflare Pages
 
@@ -92,7 +92,7 @@ Plans:
 - [x] 03-03-PLAN.md — __init__.py: lenient parameter, 10-table catalogue, problems collection, balance computation, uncatalogued-DBF scan
 
 **Wave 4** *(blocked on Wave 3 completion)*
-- [ ] 03-04-PLAN.md — xlsx.py Phase 3 renderers (_render_balan_sheet conditional banner, _render_balance_sheet, _render_problems_sheet, render() sheet order) + cli.py --lenient flag
+- [x] 03-04-PLAN.md — xlsx.py Phase 3 renderers (_render_balan_sheet conditional banner, _render_balance_sheet, _render_problems_sheet, render() sheet order) + cli.py --lenient flag
 
 ### Phase 4: Full CLI & PyPI Publication
 **Goal**: The tool is installable from PyPI, the CLI handles all v1 options, and the published wheel is ready for `micropip` consumption by the PWA
@@ -128,6 +128,6 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 |-------|----------------|--------|-----------|
 | 1. Journal Slice | 4/4 | Complete   | 2026-05-15 |
 | 2. ZIP & Subaccounts | 3/3 | Complete   | 2026-05-16 |
-| 3. Full Tables, Balance & Lenient Path | 3/4 | In Progress|  |
+| 3. Full Tables, Balance & Lenient Path | 4/4 | Complete   | 2026-05-17 |
 | 4. Full CLI & PyPI Publication | 0/TBD | Not started | - |
 | 5. Browser PWA | 0/TBD | Not started | - |
