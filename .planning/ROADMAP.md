@@ -128,6 +128,6 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 |-------|----------------|--------|-----------|
 | 1. Journal Slice | 4/4 | Complete   | 2026-05-15 |
 | 2. ZIP & Subaccounts | 3/3 | Complete   | 2026-05-16 |
-| 3. Full Tables, Balance & Lenient Path | 4/4 | Complete   | 2026-05-17 |
+| 3. Full Tables, Balance & Lenient Path | 5/5 | Complete   | 2026-05-17 |
 | 4. Full CLI & PyPI Publication | 0/TBD | Not started | - |
 | 5. Browser PWA | 0/TBD | Not started | - |
