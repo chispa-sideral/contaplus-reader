@@ -482,3 +482,346 @@ def test_subcta_sheet_empty_table_has_header_row() -> None:
     assert header_row == ["cod", "titulo"], (
         f"Expected header row on empty Subcuentas sheet, got: {header_row}"
     )
+
+
+# ===========================================================================
+# Phase 3 failing tests (plan 03-01) -- all RED; GREEN in plans 03-02/03/04
+# ===========================================================================
+
+# ---------------------------------------------------------------------------
+# Phase 3 helpers
+# ---------------------------------------------------------------------------
+
+def _make_data_with_all_tables() -> "ContaPlusData":
+    """Build a ContaPlusData with all operational tables populated."""
+    from contaplus_reader.models import ContaPlusData, GenericTable
+
+    journal = _make_journal(_sample_row())
+    empty_venci = GenericTable(
+        headers=("FECHA", "COD", "ACPA"),
+        rows=(),
+        source_name=None,
+    )
+    empty_prede = GenericTable(
+        headers=("ASIEN", "TSUBCTA"),
+        rows=(),
+        source_name=None,
+    )
+    empty_amoinv = GenericTable(
+        headers=("NUMEROINV", "DOCUMENTO"),
+        rows=(),
+        source_name=None,
+    )
+    empty_nivel = GenericTable(
+        headers=("N1", "N2", "LASTCASADO"),
+        rows=(),
+        source_name=None,
+    )
+    data = ContaPlusData(journal=journal)  # type: ignore[call-arg]
+    # Set Phase 3 attributes; will be None-typed until ContaPlusData is extended
+    data.venci = empty_venci  # type: ignore[attr-defined]
+    data.prede = empty_prede  # type: ignore[attr-defined]
+    data.amoinv = empty_amoinv  # type: ignore[attr-defined]
+    data.nivel = empty_nivel  # type: ignore[attr-defined]
+    return data
+
+
+def _make_data_with_problems() -> "ContaPlusData":
+    """Build a ContaPlusData with a non-empty problems report."""
+    from contaplus_reader.models import (
+        ContaPlusData,
+        ProblemEntry,  # type: ignore[attr-defined]
+        ProblemsReport,  # type: ignore[attr-defined]
+    )
+
+    journal = _make_journal(_sample_row())
+    data = ContaPlusData(journal=journal)  # type: ignore[call-arg]
+    entry = ProblemEntry(  # type: ignore[call-arg]
+        table="DIARIO",
+        row_index=5,
+        column="subcuenta",
+        reason="Malformed subcuenta code",
+        value="BADCODE",
+    )
+    data.problems = ProblemsReport(entries=(entry,))  # type: ignore[attr-defined]
+    return data
+
+
+def _make_data_with_balanced_balan() -> "ContaPlusData":
+    """Build ContaPlusData with a BALAN GenericTable whose SDO_CIERRE sums to 0."""
+    from decimal import Decimal
+    from contaplus_reader.models import ContaPlusData, GenericTable
+
+    journal = _make_journal(_sample_row())
+    headers = (
+        "NATURALEZA", "CODBAL", "DESCRIP", "CTA", "TIPO", "BITMAP",
+        "DOBLE", "FORMULA", "NIVEL", "DESGLOSE", "ACPA", "NUMERO",
+        "CTAPGC", "SDO_CIERRE", "NIV_CIERRE", "LINTERRUMP", "NOTMEMORIA",
+    )
+    sdo_idx = headers.index("SDO_CIERRE")
+    # SDO_CIERRE: 100.00 + (-60.00) + (-40.00) = 0.00 — balanced
+    rows = (
+        tuple(Decimal("100.00") if i == sdo_idx else "" for i in range(len(headers))),
+        tuple(Decimal("-60.00") if i == sdo_idx else "" for i in range(len(headers))),
+        tuple(Decimal("-40.00") if i == sdo_idx else "" for i in range(len(headers))),
+    )
+    balan = GenericTable(headers=headers, rows=rows, source_name=None)
+    data = ContaPlusData(journal=journal)  # type: ignore[call-arg]
+    data.balan = balan  # type: ignore[attr-defined]
+    return data
+
+
+def _make_data_with_unbalanced_balan() -> "ContaPlusData":
+    """Build ContaPlusData with a BALAN GenericTable whose SDO_CIERRE sums to != 0."""
+    from decimal import Decimal
+    from contaplus_reader.models import ContaPlusData, GenericTable
+
+    journal = _make_journal(_sample_row())
+    headers = (
+        "NATURALEZA", "CODBAL", "DESCRIP", "CTA", "TIPO", "BITMAP",
+        "DOBLE", "FORMULA", "NIVEL", "DESGLOSE", "ACPA", "NUMERO",
+        "CTAPGC", "SDO_CIERRE", "NIV_CIERRE", "LINTERRUMP", "NOTMEMORIA",
+    )
+    sdo_idx = headers.index("SDO_CIERRE")
+    # SDO_CIERRE: 100.00 + (-60.00) + (-30.00) = 10.00 — descuadre!
+    rows = (
+        tuple(Decimal("100.00") if i == sdo_idx else "" for i in range(len(headers))),
+        tuple(Decimal("-60.00") if i == sdo_idx else "" for i in range(len(headers))),
+        tuple(Decimal("-30.00") if i == sdo_idx else "" for i in range(len(headers))),
+    )
+    balan = GenericTable(headers=headers, rows=rows, source_name=None)
+    data = ContaPlusData(journal=journal)  # type: ignore[call-arg]
+    data.balan = balan  # type: ignore[attr-defined]
+    return data
+
+
+def _make_data_with_balance() -> "ContaPlusData":
+    """Build ContaPlusData with both cuenta and subcuenta BalanceTables."""
+    import datetime
+    from decimal import Decimal
+    from contaplus_reader.models import (
+        BalanceRow,  # type: ignore[attr-defined]
+        BalanceTable,  # type: ignore[attr-defined]
+        ContaPlusData,
+    )
+
+    journal = _make_journal(_sample_row())
+    br_cuenta = BalanceRow(  # type: ignore[call-arg]
+        code="4300",
+        suma_debe=Decimal("100"),
+        suma_haber=Decimal("0"),
+        saldo_deudor=Decimal("100"),
+        saldo_acreedor=Decimal("0"),
+        saldo=Decimal("100"),
+    )
+    br_sub = BalanceRow(  # type: ignore[call-arg]
+        code="4300000",
+        suma_debe=Decimal("100"),
+        suma_haber=Decimal("0"),
+        saldo_deudor=Decimal("100"),
+        saldo_acreedor=Decimal("0"),
+        saldo=Decimal("100"),
+        descripcion="Cliente XYZ",
+    )
+    balance_cuenta = BalanceTable(rows=(br_cuenta,), level="cuenta")  # type: ignore[call-arg]
+    balance_subcuenta = BalanceTable(rows=(br_sub,), level="subcuenta")  # type: ignore[call-arg]
+    data = ContaPlusData(journal=journal)  # type: ignore[call-arg]
+    data.balance_cuenta = balance_cuenta  # type: ignore[attr-defined]
+    data.balance_subcuenta = balance_subcuenta  # type: ignore[attr-defined]
+    return data
+
+
+def _make_data_with_skipped_memo_no_problems() -> "ContaPlusData":
+    """ContaPlusData where journal has skipped_memo=1 but problems is None."""
+    from contaplus_reader.models import ContaPlusData, ContaPlusJournal
+
+    journal = ContaPlusJournal(rows=(_sample_row(),), skipped_memo=1)
+    data = ContaPlusData(journal=journal)  # type: ignore[call-arg]
+    # No problems attribute set: remains None
+    return data
+
+
+# ---------------------------------------------------------------------------
+# XLSX-02: Operational-table sheets
+# ---------------------------------------------------------------------------
+
+def test_full_zip_all_tables_sheets_present() -> None:
+    """XLSX-02: render(data_with_all_tables) produces Vencimientos / Predefinidos /
+    Amortizaciones / Niveles sheets.
+
+    RED: ContaPlusData does not yet have venci/prede/amoinv/nivel attributes;
+    render() does not yet create these sheets.
+    GREEN when: ContaPlusData extended + render() creates all 4 operational sheets.
+    """
+    from contaplus_reader.xlsx import render
+
+    data = _make_data_with_all_tables()
+    wb = load_workbook(io.BytesIO(render(data)))
+    sheet_titles = [ws.title for ws in wb.worksheets]
+    assert "Vencimientos" in sheet_titles
+    assert "Predefinidos" in sheet_titles
+    assert "Amortizaciones" in sheet_titles
+    assert "Niveles" in sheet_titles
+
+
+# ---------------------------------------------------------------------------
+# XLSX-02: Problems sheet
+# ---------------------------------------------------------------------------
+
+def test_problems_sheet_present() -> None:
+    """XLSX-02: render(data_with_problems) produces a 'Problemas' sheet.
+
+    RED: ContaPlusData does not have .problems; render() does not create this sheet.
+    GREEN when: ContaPlusData.problems + render() _render_problems_sheet() implemented.
+    """
+    from contaplus_reader.xlsx import render
+
+    data = _make_data_with_problems()
+    wb = load_workbook(io.BytesIO(render(data)))
+    sheet_titles = [ws.title for ws in wb.worksheets]
+    assert "Problemas" in sheet_titles
+
+
+def test_problems_sheet_columns() -> None:
+    """XLSX-02: Problemas sheet row 1 has 'Tabla', 'Fila', 'Columna', 'Motivo', 'Valor' in A-E.
+
+    RED: same as test_problems_sheet_present.
+    GREEN when: _render_problems_sheet() uses _PROBLEMS_HEADERS.
+    """
+    from contaplus_reader.xlsx import render
+
+    data = _make_data_with_problems()
+    wb = load_workbook(io.BytesIO(render(data)))
+    ws = wb["Problemas"]
+    headers = [ws.cell(row=1, column=c).value for c in range(1, 6)]
+    assert headers == ["Tabla", "Fila", "Columna", "Motivo", "Valor"]
+
+
+def test_problems_sheet_has_entries() -> None:
+    """XLSX-02: Problemas sheet row 2 has entry.table value in column A.
+
+    RED: same as test_problems_sheet_present.
+    GREEN when: _render_problems_sheet() writes entries starting at row 2.
+    """
+    from contaplus_reader.xlsx import render
+
+    data = _make_data_with_problems()
+    wb = load_workbook(io.BytesIO(render(data)))
+    ws = wb["Problemas"]
+    assert ws.cell(row=2, column=1).value == "DIARIO"
+
+
+def test_memo_not_in_problems() -> None:
+    """XLSX-02 / D-05: render() does not produce Problemas sheet when only memo skips exist.
+
+    RED: same as test_problems_sheet_present.
+    GREEN when: render() only creates 'Problemas' when problems.entries is non-empty.
+    """
+    from contaplus_reader.xlsx import render
+
+    data = _make_data_with_skipped_memo_no_problems()
+    wb = load_workbook(io.BytesIO(render(data)))
+    sheet_titles = [ws.title for ws in wb.worksheets]
+    assert "Problemas" not in sheet_titles
+
+
+# ---------------------------------------------------------------------------
+# XLSX-03: BALAN conditional banner (D-09)
+# ---------------------------------------------------------------------------
+
+def test_balan_no_banner_when_balanced() -> None:
+    """XLSX-03 / D-09: Balanced BALAN — 'Balance' sheet row 1 is a header row (no banner).
+
+    RED: render() does not yet create a 'Balance' sheet.
+    GREEN when: _render_balan_sheet() checks SDO_CIERRE sum; no banner when balanced.
+    """
+    from contaplus_reader.xlsx import render
+
+    data = _make_data_with_balanced_balan()
+    wb = load_workbook(io.BytesIO(render(data)))
+    ws = wb["Balance"]
+    # Row 1 must be the header row (a field name, not a warning string)
+    cell_a1_value = ws.cell(row=1, column=1).value
+    assert cell_a1_value is not None
+    assert "AVISO" not in str(cell_a1_value)
+
+
+def test_balan_banner_on_descuadre() -> None:
+    """XLSX-03 / D-09: Unbalanced BALAN — 'Balance' sheet row 1 cell A1 contains 'AVISO'.
+
+    RED: render() does not yet create a 'Balance' sheet.
+    GREEN when: _render_balan_sheet() injects banner row when SDO_CIERRE sum != 0.
+    """
+    from contaplus_reader.xlsx import render
+
+    data = _make_data_with_unbalanced_balan()
+    wb = load_workbook(io.BytesIO(render(data)))
+    ws = wb["Balance"]
+    cell_a1_value = ws.cell(row=1, column=1).value
+    assert cell_a1_value is not None
+    assert "AVISO" in str(cell_a1_value)
+
+
+# ---------------------------------------------------------------------------
+# XLSX-02: Sumas y Saldos sheets (BAL-02)
+# ---------------------------------------------------------------------------
+
+def test_balance_cuenta_sheet_present() -> None:
+    """XLSX-02: render() with BalanceTable produces 'Sumas y Saldos (Cuentas)' sheet.
+
+    RED: ContaPlusData does not have .balance_cuenta; render() doesn't create this sheet.
+    GREEN when: ContaPlusData extended + render() calls _render_balance_sheet().
+    """
+    from contaplus_reader.xlsx import render
+
+    data = _make_data_with_balance()
+    wb = load_workbook(io.BytesIO(render(data)))
+    sheet_titles = [ws.title for ws in wb.worksheets]
+    assert "Sumas y Saldos (Cuentas)" in sheet_titles
+
+
+def test_balance_subcuenta_sheet_present() -> None:
+    """XLSX-02: render() with BalanceTable produces 'Sumas y Saldos (Subcuentas)' sheet.
+
+    RED: same as test_balance_cuenta_sheet_present.
+    GREEN when: same fix.
+    """
+    from contaplus_reader.xlsx import render
+
+    data = _make_data_with_balance()
+    wb = load_workbook(io.BytesIO(render(data)))
+    sheet_titles = [ws.title for ws in wb.worksheets]
+    assert "Sumas y Saldos (Subcuentas)" in sheet_titles
+
+
+def test_balance_subcuenta_descripcion() -> None:
+    """XLSX-02 / D-08: Subcuenta-level sheet has 'Descripción' as column B header.
+
+    RED: render() does not produce 'Sumas y Saldos (Subcuentas)' yet.
+    GREEN when: _render_balance_sheet() uses _BALANCE_HEADERS_SUBCUENTA with Descripción.
+    """
+    from contaplus_reader.xlsx import render
+
+    data = _make_data_with_balance()
+    wb = load_workbook(io.BytesIO(render(data)))
+    ws = wb["Sumas y Saldos (Subcuentas)"]
+    assert ws.cell(row=1, column=2).value == "Descripción"
+
+
+def test_balance_cuenta_columns() -> None:
+    """XLSX-02 / D-08: Cuenta-level sheet has the expected 6 column headers.
+
+    Expected: 'Cuenta', 'Suma Debe', 'Suma Haber', 'Saldo Deudor', 'Saldo Acreedor', 'Saldo'
+    RED: render() does not produce 'Sumas y Saldos (Cuentas)' yet.
+    GREEN when: _render_balance_sheet() uses _BALANCE_HEADERS_CUENTA.
+    """
+    from contaplus_reader.xlsx import render
+
+    data = _make_data_with_balance()
+    wb = load_workbook(io.BytesIO(render(data)))
+    ws = wb["Sumas y Saldos (Cuentas)"]
+    headers = [ws.cell(row=1, column=c).value for c in range(1, 7)]
+    assert headers == [
+        "Cuenta", "Suma Debe", "Suma Haber",
+        "Saldo Deudor", "Saldo Acreedor", "Saldo",
+    ]
