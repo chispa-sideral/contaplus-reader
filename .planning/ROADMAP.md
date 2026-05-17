@@ -83,7 +83,7 @@ Plans:
 
 Plans:
 **Wave 1**
-- [ ] 03-01-PLAN.md — Test scaffold: conftest fixtures (venci/prede/amoinv/nivel/balan/lenient DBFs) + failing tests for all Phase 3 behaviors
+- [x] 03-01-PLAN.md — Test scaffold: conftest fixtures (venci/prede/amoinv/nivel/balan/lenient DBFs) + failing tests for all Phase 3 behaviors
 
 **Wave 2** *(blocked on Wave 1 completion)*
 - [ ] 03-02-PLAN.md — models.py Phase 3 types (ProblemEntry, BalanceRow, BalanceTable), new _balance.py (compute_balance Decimal), _reader.py lenient extension (_build_journal_row + lenient/problems params)
@@ -128,6 +128,6 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 |-------|----------------|--------|-----------|
 | 1. Journal Slice | 4/4 | Complete   | 2026-05-15 |
 | 2. ZIP & Subaccounts | 3/3 | Complete   | 2026-05-16 |
-| 3. Full Tables, Balance & Lenient Path | 0/4 | Not started | - |
+| 3. Full Tables, Balance & Lenient Path | 1/4 | In Progress|  |
 | 4. Full CLI & PyPI Publication | 0/TBD | Not started | - |
 | 5. Browser PWA | 0/TBD | Not started | - |
