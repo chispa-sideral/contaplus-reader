@@ -222,3 +222,75 @@ def test_no_problems_when_clean(single_company_zip: Path) -> None:
     data = read(single_company_zip.read_bytes(), lenient=True)
     assert isinstance(data, ContaPlusData)
     assert data.problems is None
+
+
+# ---------------------------------------------------------------------------
+# WR-05: dbfread ValueError during per-row iteration skipped in lenient mode
+# ---------------------------------------------------------------------------
+
+def test_lenient_dbfread_valueerror_skipped(diario_with_bad_row: Path) -> None:
+    """WR-05: lenient=True with _build_journal_row raising ValueError on idx==1.
+
+    Patch _build_journal_row to raise ValueError("simulated dbfread error") on
+    the second call (idx==1). Lenient mode must skip that row, return 2 good rows,
+    and record one ProblemEntry(table="DIARIO", row_index==1).
+
+    RED: inner except only catches ContaPlusReadError; ValueError escapes to outer
+         except (struct.error, ValueError, OSError) which creates a file-level
+         error with row_index=-1, aborting the whole journal rather than skipping
+         the bad row.
+    GREEN when: inner except catches (ContaPlusReadError, ValueError).
+    """
+    from unittest.mock import patch, call as _call
+    import contaplus_reader._reader as _reader_mod
+
+    # The original _build_journal_row function — we need to call it for non-patched rows.
+    original_fn = _reader_mod._build_journal_row
+    call_count = [0]
+
+    def _patched(*args, **kwargs):  # type: ignore[no-untyped-def]
+        idx = args[1]  # positional arg 1 is idx
+        call_count[0] += 1
+        if idx == 1:
+            raise ValueError("simulated dbfread field error")
+        return original_fn(*args, **kwargs)
+
+    with patch.object(_reader_mod, "_build_journal_row", side_effect=_patched):
+        data = read(diario_with_bad_row.read_bytes(), lenient=True)
+
+    assert data.journal is not None, "Expected journal to be returned in lenient mode"
+    assert len(data.journal.rows) == 2, (
+        f"Expected 2 rows (bad row skipped), got {len(data.journal.rows)}"
+    )
+    assert data.problems is not None, "Expected problems to be collected"
+    matching = [e for e in data.problems.entries if e.row_index == 1]
+    assert len(matching) == 1, (
+        f"Expected one ProblemEntry with row_index=1, got: {data.problems.entries}"
+    )
+    assert matching[0].table == "DIARIO", (
+        f"Expected table='DIARIO', got {matching[0].table!r}"
+    )
+    assert matching[0].row_index == 1
+
+
+def test_lenient_dbfread_valueerror_strict_raises(diario_with_bad_row: Path) -> None:
+    """WR-05: strict mode with _build_journal_row raising ValueError must propagate as an error.
+
+    In strict mode (lenient=False), a ValueError from _build_journal_row during
+    iteration must NOT be silently swallowed — it must propagate (either as the
+    raw ValueError or wrapped as ContaPlusReadError via the outer handler).
+    """
+    from unittest.mock import patch
+    import contaplus_reader._reader as _reader_mod
+
+    original_fn = _reader_mod._build_journal_row
+
+    def _patched(*args, **kwargs):  # type: ignore[no-untyped-def]
+        idx = args[1]
+        if idx == 1:
+            raise ValueError("simulated dbfread field error")
+        return original_fn(*args, **kwargs)
+
+    with patch.object(_reader_mod, "_build_journal_row", side_effect=_patched):
+        with pytest.raises((ContaPlusReadError, ValueError)):
+            read(diario_with_bad_row.read_bytes())  # strict = default
