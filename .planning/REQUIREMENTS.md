@@ -26,27 +26,27 @@ Requirements for the initial release. Each maps to roadmap phases.
 
 - [x] **TABL-01**: Typed reader for `SUBCTA.DBF` (chart of subaccounts) with defensive field-name resolution (`CODIGO`/`COD`, `DESCRIP`/`TITULO`, `NIF`/`CIF`)
 - [x] **TABL-02**: Typed readers for the group-level tables (`grupos.dbf`, `usuarios.dbf`, `empresa.dbf`)
-- [ ] **TABL-03**: Typed readers for the operational tables (`venci.dbf`, `prede.dbf`, `amoinv.dbf`, `nivel.dbf`), with field schemas validated against real `pii-test-data/` archives before implementation
-- [ ] **TABL-04**: Reader extracts every recognized table from a backup ZIP in a single pass
+- [x] **TABL-03**: Typed readers for the operational tables (`venci.dbf`, `prede.dbf`, `amoinv.dbf`, `nivel.dbf`), with field schemas validated against real `pii-test-data/` archives before implementation
+- [x] **TABL-04**: Reader extracts every recognized table from a backup ZIP in a single pass
 
 ### Trial Balance
 
-- [ ] **BAL-01**: Typed reader extracts the raw `BALAN.DBF` trial-balance data
-- [ ] **BAL-02**: Tool computes an authoritative trial balance (sumas y saldos) from `DIARIO.DBF` journal data
+- [x] **BAL-01**: Typed reader extracts the raw `BALAN.DBF` trial-balance data
+- [x] **BAL-02**: Tool computes an authoritative trial balance (sumas y saldos) from `DIARIO.DBF` journal data
 
 ### Read API & Result Model
 
 - [ ] **API-01**: Library exposes a single bytes-first read API used by all consumers (CLI, PWA, tax-workbench)
 - [x] **API-02**: Strict read path fails loudly on invalid data, raising `ContaPlusReadError` with row/column/context
-- [ ] **API-03**: Lenient conversion path extracts all readable data, collects problems into a report, and never aborts the whole file
+- [x] **API-03**: Lenient conversion path extracts all readable data, collects problems into a report, and never aborts the whole file
 - [ ] **API-04**: Library returns self-contained result types (`ContaPlusJournal` and per-table siblings) with no `tw-domain` dependency
 - [x] **API-05**: Journal result is enriched with account/subaccount names when `SUBCTA.DBF` is present in the input
 
 ### XLSX Rendering
 
 - [x] **XLSX-01**: Shared, templated XLSX renderer produces a styled workbook with one sheet per extracted table
-- [ ] **XLSX-02**: Renderer includes a problems/report sheet listing rows the lenient path skipped or flagged
-- [ ] **XLSX-03**: Renderer marks the raw `BALAN` sheet with a visible "derived — may be unreliable" disclaimer
+- [x] **XLSX-02**: Renderer includes a problems/report sheet listing rows the lenient path skipped or flagged
+- [x] **XLSX-03**: Renderer marks the raw `BALAN` sheet with a visible "derived — may be unreliable" disclaimer
 - [x] **XLSX-04**: Renderer is callable identically from the CLI and the PWA, with no filesystem assumptions
 
 ### CLI (`contaplus2xlsx`)
@@ -116,18 +116,18 @@ Which phases cover which requirements.
 | JRNL-03 | Phase 1 | Complete |
 | TABL-01 | Phase 2 | Complete |
 | TABL-02 | Phase 2 | Complete |
-| TABL-03 | Phase 3 | Pending |
-| TABL-04 | Phase 3 | Pending |
-| BAL-01 | Phase 3 | Pending |
-| BAL-02 | Phase 3 | Pending |
+| TABL-03 | Phase 3 | Complete |
+| TABL-04 | Phase 3 | Complete |
+| BAL-01 | Phase 3 | Complete |
+| BAL-02 | Phase 3 | Complete |
 | API-01 | Phase 1 | Pending |
 | API-02 | Phase 1 | Complete |
-| API-03 | Phase 3 | Pending |
+| API-03 | Phase 3 | Complete |
 | API-04 | Phase 1 | Pending |
 | API-05 | Phase 2 | Complete |
 | XLSX-01 | Phase 1 | Complete |
-| XLSX-02 | Phase 3 | Pending |
-| XLSX-03 | Phase 3 | Pending |
+| XLSX-02 | Phase 3 | Complete |
+| XLSX-03 | Phase 3 | Complete |
 | XLSX-04 | Phase 1 | Complete |
 | CLI-01 | Phase 1 | Complete |
 | CLI-02 | Phase 4 | Complete |

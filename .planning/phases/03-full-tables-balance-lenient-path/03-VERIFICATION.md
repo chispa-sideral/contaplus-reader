@@ -1,27 +1,27 @@
 ---
 phase: 03-full-tables-balance-lenient-path
-verified: 2026-05-17T00:00:00Z
-status: gaps_found
-score: 4/5 must-haves verified
+verified: 2026-05-18T00:00:00Z
+status: passed
+score: 5/5 must-haves verified
 overrides_applied: 0
-gaps:
-  - truth: "A lenient conversion of a corrupt-DIARIO ZIP produces a workbook with other tables + problems sheet (D-03 end-to-end)"
-    status: failed
-    reason: "render() unconditionally calls _render_journal_sheet(wb.active, data.journal) without a None guard. When data.journal is None (D-03 path), _render_journal_sheet iterates journal.rows and raises AttributeError: 'NoneType' object has no attribute 'rows'. The lenient read() path correctly sets journal=None and collects a ProblemEntry, but the subsequent render() call crashes before producing the workbook. Confirmed by direct execution: ContaPlusData(journal=None) -> render() raises AttributeError."
-    artifacts:
-      - path: "src/contaplus_reader/xlsx.py"
-        issue: "_render_journal_sheet(wb.active, data.journal) at line 87 has no None guard; type: ignore[arg-type] suppresses the type error but does not make the call safe"
-    missing:
-      - "Guard the journal sheet render: if data.journal is not None: _render_journal_sheet(ws, data.journal) else: ws.title = 'Diario'  # write headers only"
-      - "Test: render(ContaPlusData(journal=None, subcta=...)) succeeds and returns valid workbook bytes"
+re_verification:
+  previous_status: gaps_found
+  previous_score: 4/5
+  gaps_closed:
+    - "A lenient conversion of a corrupt-DIARIO ZIP produces a workbook with other tables + problems sheet (D-03 end-to-end)"
+    - "WR-05: per-row dbfread ValueError escapes inner handler to file-level abort"
+    - "ProblemEntry.table casing inconsistent across call sites"
+    - "CLI sheet_count undercount (only counted Phase 1/2 tables)"
+  gaps_remaining: []
+  regressions: []
 ---
 
 # Phase 3: Full Tables, Balance & Lenient Path Verification Report
 
 **Phase Goal:** A user running lenient conversion gets every readable table extracted — including operational tables and a recomputed trial balance — plus a problems sheet listing anything that was skipped
-**Verified:** 2026-05-17
-**Status:** gaps_found
-**Re-verification:** No — initial verification
+**Verified:** 2026-05-18
+**Status:** passed
+**Re-verification:** Yes — after gap closure (plan 03-05)
 
 ---
 
@@ -31,112 +31,124 @@ gaps:
 
 | # | Truth | Status | Evidence |
 |---|-------|--------|----------|
-| 1 | A backup ZIP converted with `--lenient` produces sheets for venci, prede, amoinv, and nivel | VERIFIED | `_render_generic_sheet` called for all four; `render()` sheet-order confirmed in xlsx.py:103-110; `test_full_zip_all_tables_sheets_present` passes |
-| 2 | The workbook contains a Problemas sheet listing every row the lenient path flagged, with row and column context | VERIFIED | `_render_problems_sheet` writes five columns (Tabla/Fila/Columna/Motivo/Valor); conditional only when `data.problems.entries` is non-empty (D-05); tested by `test_problems_sheet_present`, `test_problems_sheet_columns`, `test_problems_sheet_has_entries` |
-| 3 | The BALAN sheet carries the descuadre disclaimer only when its own figures fail to balance; two recomputed trial-balance sheets are always present (D-07/D-09 refinements) | VERIFIED | `_render_balan_sheet` sums SDO_CIERRE with Decimal and injects banner only on non-zero sum; `test_balan_banner_on_descuadre` and `test_balan_no_banner_when_balanced` pass; `balance_cuenta`/`balance_subcuenta` computed from journal whenever it is not None |
-| 4 | Field schemas for venci, prede, amoinv, and nivel are validated against pii-test-data/ before readers are committed | VERIFIED | 03-RESEARCH.md §Q1 documents schema enumeration across all 5 real archives (confirmed 2026-05-17); test fixtures use exact field schemas from that enumeration; synthetic fixtures do not use pii-test-data/ blobs |
-| 5 | A lenient conversion of a corrupt-DIARIO ZIP produces a workbook containing all other readable tables plus a problems sheet (D-03 end-to-end) | FAILED | `render()` crashes with `AttributeError: 'NoneType' object has no attribute 'rows'` when `data.journal is None`. The `read()` path correctly implements D-03 (journal=None + ProblemEntry) and is tested by `test_lenient_corrupt_journal`. The `render()` path is not guarded and is not tested. End-to-end lenient conversion of a corrupt-DIARIO archive produces no workbook. |
+| 1 | A backup ZIP converted with `--lenient` produces sheets for venci, prede, amoinv, and nivel | VERIFIED | `_render_generic_sheet` called for all four in `render()` lines 108-115; `test_full_zip_all_tables_sheets_present` passes |
+| 2 | The workbook contains a Problemas sheet listing every row the lenient path flagged, with row and column context | VERIFIED | `_render_problems_sheet` writes five columns (Tabla/Fila/Columna/Motivo/Valor); conditional on non-empty entries; `test_problems_sheet_present`, `test_problems_sheet_columns`, `test_problems_sheet_has_entries` all pass |
+| 3 | The BALAN sheet carries the descuadre disclaimer only when its own figures fail to balance; two recomputed trial-balance sheets are always present | VERIFIED | `_render_balan_sheet` sums SDO_CIERRE with Decimal and injects banner only on non-zero sum; `balance_cuenta`/`balance_subcuenta` computed from journal when not None; `test_balan_banner_on_descuadre` and `test_balan_no_banner_when_balanced` pass |
+| 4 | Field schemas for venci, prede, amoinv, and nivel are validated against pii-test-data/ before readers are committed | VERIFIED | 03-RESEARCH.md documents schema enumeration across all 5 real archives; test fixtures use exact field schemas from that enumeration; pii-test-data/ not committed |
+| 5 | A lenient conversion of a corrupt-DIARIO ZIP produces a workbook containing all other readable tables plus a problems sheet (D-03 end-to-end) | VERIFIED | `xlsx.py:89` guards `if data.journal is not None`; `_write_diario_headers_only` writes headers-only Diario sheet when journal is None; `test_render_journal_none_produces_valid_workbook` and `test_render_lenient_end_to_end` both pass; `type: ignore[arg-type]` suppression removed |
 
-**Score:** 4/5 truths verified
+**Score:** 5/5 truths verified
 
 ---
 
-## Required Artifacts
+### Required Artifacts
 
 | Artifact | Expected | Status | Details |
 |----------|----------|--------|---------|
 | `src/contaplus_reader/models.py` | ProblemEntry, ProblemsReport, BalanceRow, BalanceTable, ContaPlusData Phase 3 attributes | VERIFIED | All types present; ContaPlusData has balan/venci/prede/amoinv/nivel/balance_cuenta/balance_subcuenta/problems |
-| `src/contaplus_reader/_balance.py` | compute_balance() with Decimal accumulation | VERIFIED | Decimal(str(row.debe)) pattern used; defaultdict accumulators; sorted output |
-| `src/contaplus_reader/_reader.py` | _build_journal_row helper + lenient/problems parameters | VERIFIED | Inner try/except ContaPlusReadError catches per-row errors and appends ProblemEntry when lenient; file-level errors re-raise |
-| `src/contaplus_reader/__init__.py` | lenient param, 10-table catalogue, D-03/D-04/D-13 wiring | VERIFIED | _CATALOGUE frozenset; _read_secondary_table helper; D-03 try/except around journal read; D-13 uncatalogued scan |
-| `src/contaplus_reader/xlsx.py` | Phase 3 renderers, render() sheet order, problems sheet | PARTIAL | _render_balan_sheet, _render_balance_sheet, _render_problems_sheet all implemented correctly; render() sheet order correct; BUT render() line 87 calls _render_journal_sheet unconditionally without a None guard (WR-06) |
-| `src/contaplus_reader/cli.py` | --lenient flag | VERIFIED | Typer option wired to read(lenient=lenient) |
+| `src/contaplus_reader/_balance.py` | compute_balance() with Decimal accumulation | VERIFIED | Decimal(str(row.debe)) pattern; defaultdict accumulators; sorted output |
+| `src/contaplus_reader/_reader.py` | _build_journal_row helper + lenient/problems params + ValueError catch | VERIFIED | Inner `except (ContaPlusReadError, ValueError)` at line 296; isinstance discrimination; lenient skips, strict re-raises |
+| `src/contaplus_reader/__init__.py` | lenient param, 10-table catalogue, D-03/D-04/D-13 wiring, canonical ProblemEntry.table | VERIFIED | `_CATALOGUE` frozenset; `_read_secondary_table` uses `Path(table_name).stem.upper()` (line 92); D-13 block uses `candidate.stem.upper()` (line 249) |
+| `src/contaplus_reader/xlsx.py` | render() None guard for journal, _write_diario_headers_only, all Phase 3 renderers | VERIFIED | `if data.journal is not None` at line 89; `_write_diario_headers_only` at line 183; all six renderers present; no `type: ignore[arg-type]` |
+| `src/contaplus_reader/cli.py` | --lenient flag; sheet_count from rendered workbook | VERIFIED | `lenient` Typer option wired to `read(lenient=lenient)`; `len(_load_wb(BytesIO(xlsx_bytes), read_only=True, data_only=True).sheetnames)` at line 129 |
+| `tests/test_xlsx.py` | test_render_journal_none_produces_valid_workbook + test_render_lenient_end_to_end | VERIFIED | Both tests present and pass |
+| `tests/test_lenient.py` | test_lenient_dbfread_valueerror_skipped + updated casing assertions | VERIFIED | `test_lenient_dbfread_valueerror_skipped` and `test_lenient_dbfread_valueerror_strict_raises` present; table casing assertions use canonical `== "VENCI"` / `== "EXTRA"` (no .lower()/.upper() workarounds) |
 
 ---
 
-## Key Link Verification
+### Key Link Verification
 
 | From | To | Via | Status | Details |
 |------|----|-----|--------|---------|
 | `read()` | `_read_dbf_path()` | `lenient=True, problems=collected_problems` | VERIFIED | Both ZIP and raw-DBF paths pass lenient/problems through |
-| `read()` | `compute_balance()` | Called after journal read when journal is not None | VERIFIED | Both cuenta and subcuenta levels computed; subcta_lookup reused |
-| `render()` | `_render_journal_sheet()` | `wb.active, data.journal` — unconditional | BROKEN | No None guard; crashes when data.journal is None (WR-06) |
-| `render()` | `_render_problems_sheet()` | Conditional: only when problems.entries non-empty | VERIFIED | D-05 honored |
-| `render()` | `_render_balan_sheet()` | Conditional: only when data.balan is not None | VERIFIED | |
-| `_read_dbf_path()` | inner `except ContaPlusReadError` | per-row lenient skip | PARTIAL | Only catches ContaPlusReadError; bare ValueError from dbfread mid-iteration escapes to outer handler (WR-05) |
+| `read()` | `compute_balance()` | Called after journal read when journal is not None | VERIFIED | Both cuenta and subcuenta levels computed |
+| `render()` | `_render_journal_sheet()` | `if data.journal is not None` guard at line 89 | VERIFIED | None guard present; no crash on journal=None |
+| `render()` | `_write_diario_headers_only()` | `else` branch when journal is None | VERIFIED | Writes "Diario" title + HEADERS + freeze_panes; max_row=1 confirmed by test |
+| `render()` | `_render_problems_sheet()` | Conditional on non-empty problems.entries | VERIFIED | D-05 honored |
+| `_read_dbf_path()` | inner `except (ContaPlusReadError, ValueError)` | per-row ValueError catch | VERIFIED | Line 296; lenient appends ProblemEntry and continues; strict re-raises to outer handler |
+| `_read_secondary_table()` | `ProblemEntry.table` | `Path(table_name).stem.upper()` | VERIFIED | Line 92; consistent uppercase stem at this call site |
+| D-13 uncatalogued block | `ProblemEntry.table` | `candidate.stem.upper()` | VERIFIED | Line 249; "EXTRA" not "EXTRA.DBF" |
 
 ---
 
-## Data-Flow Trace (Level 4)
+### Data-Flow Trace (Level 4)
 
 | Artifact | Data Variable | Source | Produces Real Data | Status |
 |----------|--------------|--------|--------------------|--------|
 | `_render_balance_sheet` | `table.rows` | `compute_balance(journal)` | Yes — Decimal accumulation over real journal rows | FLOWING |
 | `_render_balan_sheet` | `balan.rows` | `read_table_raw(balan_path)` | Yes — full DBF dump | FLOWING |
 | `_render_problems_sheet` | `report.entries` | `collected_problems` list in `read()` | Yes — real error events from lenient path | FLOWING |
-| `render()` Diario sheet | `data.journal` | `_read_dbf_path()` | Crashes when None — no data flows when journal is None | HOLLOW (WR-06) |
+| `render()` Diario sheet — journal=None path | HEADERS tuple | `_write_diario_headers_only` | Static HEADERS tuple (correct: headers-only by design) | FLOWING (by design) |
+| `render()` Diario sheet — journal present | `data.journal.rows` | `_read_dbf_path()` | Yes — validated journal rows | FLOWING |
 
 ---
 
-## Behavioral Spot-Checks
+### Behavioral Spot-Checks
 
 | Behavior | Command | Result | Status |
 |----------|---------|--------|--------|
-| 120-test suite | `uv run pytest tests/ 2>&1 \| tail -3` | `120 passed in 1.71s` | PASS |
-| render(ContaPlusData(journal=None)) | Direct Python execution | `AttributeError: 'NoneType' object has no attribute 'rows'` | FAIL |
-| Lenient read + render of corrupt-DIARIO ZIP | End-to-end Python execution | read() succeeds (journal=None, subcta populated), render() crashes | FAIL |
-| Decimal precision for N(16,2) amounts | `str(float(Decimal('99999999999999.99')))` | Round-trip fails at 100-trillion values; all realistic ContaPlus accounting amounts (up to ~10 billion) round-trip correctly | PASS (practical) |
+| 124-test suite | `uv run pytest tests/ 2>&1 \| tail -1` | `124 passed in 1.69s` | PASS |
+| render(ContaPlusData(journal=None)) | `uv run pytest tests/test_xlsx.py::test_render_journal_none_produces_valid_workbook -v` | `1 passed` | PASS |
+| D-03 end-to-end: lenient read + render of corrupt-DIARIO ZIP | `uv run pytest tests/test_xlsx.py::test_render_lenient_end_to_end -v` | `1 passed` | PASS |
+| WR-05: dbfread ValueError skipped per-row in lenient mode | `uv run pytest tests/test_lenient.py::test_lenient_dbfread_valueerror_skipped -v` | `1 passed` | PASS |
+| WR-05: strict mode propagates ValueError | `uv run pytest tests/test_lenient.py::test_lenient_dbfread_valueerror_strict_raises -v` | `1 passed` | PASS |
+| ProblemEntry.table casing (VENCI canonical) | `uv run pytest tests/test_lenient.py::test_lenient_corrupt_table -v` | `1 passed` | PASS |
+| ProblemEntry.table casing (EXTRA canonical) | `uv run pytest tests/test_lenient.py::test_lenient_uncatalogued_dbf -v` | `1 passed` | PASS |
 
 ---
 
-## Requirements Coverage
+### Requirements Coverage
 
 | Requirement | Source Plan | Description | Status | Evidence |
 |-------------|------------|-------------|--------|----------|
-| TABL-03 | 03-01-PLAN | Typed readers for venci/prede/amoinv/nivel, schemas validated against pii-test-data/ | SATISFIED | read_table_raw reused; schemas from RESEARCH.md Q1; test_tables.py 12/12 green |
-| TABL-04 | 03-01-PLAN | Reader extracts every recognized table from a ZIP in a single pass | SATISFIED | _CATALOGUE frozenset; 10 tables resolved via _find_sibling_dbf; zip_with_all_tables test passes |
-| BAL-01 | 03-01-PLAN | Typed reader extracts raw BALAN.DBF trial-balance data | SATISFIED | BALAN read via read_table_raw as GenericTable; SDO_CIERRE column verified |
-| BAL-02 | 03-01-PLAN | Tool computes authoritative trial balance from DIARIO.DBF | SATISFIED | compute_balance() in _balance.py; Decimal(str(float)) accumulation; test_balance.py 8/8 green |
-| API-03 | 03-01-PLAN | Lenient conversion path extracts all readable data, collects problems, never aborts the whole file | PARTIALLY BLOCKED | read() path is correct; but render() crashes when journal=None — the "never aborts the whole file" contract is broken at render time |
-| XLSX-02 | 03-01-PLAN | Renderer includes a problems sheet listing rows the lenient path skipped or flagged | SATISFIED | _render_problems_sheet with five Spanish columns; conditional on non-empty entries; test_problems_sheet_present passes |
-| XLSX-03 | 03-01-PLAN | Renderer marks raw BALAN sheet with visible "derived — may be unreliable" disclaimer | SATISFIED | _render_balan_sheet with conditional SDO_CIERRE banner; D-09 refinement (conditional) implemented per CONTEXT.md; tests pass |
+| TABL-03 | 03-01-PLAN | Typed readers for venci/prede/amoinv/nivel, schemas validated against pii-test-data/ | SATISFIED | `read_table_raw` reused; schemas from RESEARCH.md Q1; test_tables.py green |
+| TABL-04 | 03-01-PLAN | Reader extracts every recognized table from a ZIP in a single pass | SATISFIED | `_CATALOGUE` frozenset (10 tables); `_find_sibling_dbf` resolution; zip_with_all_tables test passes |
+| BAL-01 | 03-01-PLAN | Typed reader extracts raw BALAN.DBF trial-balance data | SATISFIED | BALAN read via `read_table_raw` as GenericTable; SDO_CIERRE column verified |
+| BAL-02 | 03-01-PLAN | Tool computes authoritative trial balance from DIARIO.DBF | SATISFIED | `compute_balance()` in `_balance.py`; Decimal(str(float)) accumulation; test_balance.py green |
+| API-03 | 03-05-PLAN | Lenient conversion path extracts all readable data, collects problems, never aborts the whole file | SATISFIED | `read()` D-03 path sets journal=None + ProblemEntry; `render()` None guard produces headers-only Diario sheet; end-to-end test passes |
+| XLSX-02 | 03-01-PLAN | Renderer includes a problems sheet listing rows the lenient path skipped or flagged | SATISFIED | `_render_problems_sheet` with five Spanish columns; conditional on non-empty entries |
+| XLSX-03 | 03-01-PLAN | Renderer marks raw BALAN sheet with visible "derived — may be unreliable" disclaimer | SATISFIED | `_render_balan_sheet` with conditional SDO_CIERRE banner; D-09 refinement (conditional) |
 
 ---
 
-## Anti-Patterns Found
+### Anti-Patterns Found
+
+These are residual code-quality findings from the 03-REVIEW.md code review of the gap-closure diff. None block the phase goal; all are advisory.
 
 | File | Line | Pattern | Severity | Impact |
 |------|------|---------|----------|--------|
-| `src/contaplus_reader/xlsx.py` | 87 | `_render_journal_sheet(wb.active, data.journal)` — no None guard, `# type: ignore[arg-type]` suppresses type error | BLOCKER | render() crashes with AttributeError when called after a lenient read() that produced journal=None (WR-06 confirmed by execution) |
-| `src/contaplus_reader/_reader.py` | 290-352 | Inner `except ContaPlusReadError` only; bare `ValueError` from dbfread mid-iteration escapes to outer `except (struct.error, ValueError, OSError)` which creates a file-level error (row_index=-1) | WARNING | A dbfread `ValueError` on a single corrupt record aborts the whole journal in lenient mode (D-03 behavior) instead of skipping the row (D-02 behavior). Contradicts D-02 guarantee but not exploitable from the test suite since all bad-row fixtures use application-level validation failures (ContaPlusReadError), not dbfread-level ValueError. |
-| `src/contaplus_reader/__init__.py` | 89-98 | `ProblemEntry(table=table_name.lower(), ...)` vs line 249 `candidate.name.upper()` vs line 181/312 `table="DIARIO"` — inconsistent ProblemEntry.table casing | WARNING | Table name convention is self-contradictory: balan -> "balan.dbf", uncatalogued -> "EXTRA.DBF", journal -> "DIARIO". PWA/consumer code filtering by table name will need case-folding. Test_lenient.py uses `.table.lower() == "venci.dbf"` and `.table.upper() == "EXTRA.DBF"` to paper over this. |
-| `src/contaplus_reader/cli.py` | 126-129 | `sheet_count` computed only from Phase 1/2 tables (journal/subcta/empresa/grupos/usuarios) | WARNING | Reports "5 sheet(s)" when a full Phase 3 workbook has 13+. User-facing summary is incorrect but does not affect extraction correctness. |
+| `src/contaplus_reader/xlsx.py` | 183, 367, 381 | `ws: Any` on `_write_diario_headers_only`, `_autosize_columns`, `_autosize_columns_from_offset` — violates CLAUDE.md no-any rule; `Worksheet` is already imported | WARNING | Disables type checker on new gap-fix code; `wb.active` is `Worksheet \| None` in openpyxl stubs; passing it into `Any`-typed param silences a legitimate None-safety warning (review WR-04) |
+| `src/contaplus_reader/xlsx.py` | 183-201 vs 150-180 | `_write_diario_headers_only` duplicates `_render_journal_sheet` header block verbatim | INFO | Drift hazard if header styling changes; not a correctness issue (review WR-03) |
+| `src/contaplus_reader/_reader.py` | 296-317 | `except (ContaPlusReadError, ValueError)` wraps entire `_build_journal_row` call including `float()` amount parsing — amount-parsing `ValueError` lands in generic branch with blank column/value | INFO | Less informative ProblemEntry for amount-parsing failures vs. ContaPlusReadError path; not a correctness blocker (review WR-01) |
+| `src/contaplus_reader/__init__.py` | 214-237 | Call sites pass inconsistently-cased `table_name` to `_read_secondary_table` (e.g. `"BALAN.DBF"` vs `"venci.dbf"`) — casing fix normalised `ProblemEntry.table` but user-facing error message still reflects raw casing | INFO | Cosmetic inconsistency in error messages; does not affect extraction correctness (review WR-02) |
+| `src/contaplus_reader/cli.py` | 129 | `data_only=True` passed to `load_workbook` for a sheet-name count — no-op and misleading | INFO | Does not affect sheet count correctness; misleads reader (review WR-05 in code review) |
+| `src/contaplus_reader/cli.py` | 127-128 | `import io as _io` and `from openpyxl import load_workbook as _load_wb` placed mid-function after several statements | INFO | Inconsistent with deferred-import grouping pattern at top of `main()`; cosmetic (review IN-01) |
+
+No BLOCKER anti-patterns. The `ws: Any` typing violation is the most significant residual issue (breaks strict-typing contract required by CLAUDE.md), but it does not affect runtime correctness or the phase goal.
 
 ---
 
-## Verification Override Notes
+### Human Verification Required
 
-**CR-01 (float precision in trial balance):** The code review flags that `JournalRow.debe/haber` are `float` and `Decimal(str(float))` can fail for amounts > ~100 trillion. Direct measurement confirms the round-trip fails only at `N(16,2)` extreme values (99999999999999.99). ContaPlus is a small-business accounting system — no real archive will contain 100-trillion-euro amounts. The `Decimal(str(float))` pattern matches the pattern prescribed by RESEARCH.md §Q4 ("Why str() and not Decimal(float_value)") and is verified against the real MELO archive. This defect is a theoretical correctness concern for the docstring claim, not a practical failure for any real ContaPlus data. It is a WARNING (code quality), not a BLOCKER for the phase goal.
+None. All must-haves are verified programmatically. The behavioral spot-checks and test suite execution confirm the D-03 end-to-end contract is satisfied.
 
 ---
 
 ## Gaps Summary
 
-One blocker prevents full phase goal achievement:
+No gaps. All four gaps from the previous verification (WR-06 BLOCKER, WR-05 WARNING, ProblemEntry.table casing WARNING, CLI sheet_count WARNING) are closed.
 
-**WR-06 — render() crashes on journal=None (D-03 lenient path).**
+**Gap closure evidence:**
+1. **WR-06 (BLOCKER closed):** `xlsx.py:89` contains `if data.journal is not None`; `_write_diario_headers_only` helper exists at line 183; `test_render_journal_none_produces_valid_workbook` and `test_render_lenient_end_to_end` both pass; `type: ignore[arg-type]` suppression is absent from the file.
+2. **WR-05 (WARNING closed):** `_reader.py:296` contains `except (ContaPlusReadError, ValueError) as exc`; `isinstance(exc, ValueError)` discrimination at line 297; `test_lenient_dbfread_valueerror_skipped` passes (2 rows returned, 1 ProblemEntry with row_index=1); `test_lenient_dbfread_valueerror_strict_raises` passes.
+3. **Table casing (WARNING closed):** `__init__.py:92` uses `Path(table_name).stem.upper()`; line 249 uses `candidate.stem.upper()`; `test_lenient_corrupt_table` asserts `e.table == "VENCI"` without workaround; `test_lenient_uncatalogued_dbf` asserts `e.table == "EXTRA"` without workaround.
+4. **CLI sheet_count (WARNING closed):** `cli.py:129` contains `load_workbook(_io.BytesIO(xlsx_bytes), read_only=True, data_only=True).sheetnames`; derived from rendered workbook.
 
-The phase goal states "a user running lenient conversion gets every readable table extracted...plus a problems sheet." When the archive's DIARIO is corrupt, `read()` correctly produces `journal=None` with a ProblemEntry (D-03 implemented). But `render(data)` is called next and immediately crashes with `AttributeError: 'NoneType' object has no attribute 'rows'` at `xlsx.py:87`. The user gets no workbook.
+**Residual quality items** (WR-01 through WR-05 from code review, IN-01 through IN-04) are advisory refinements to be addressed in a future pass or Phase 4 cleanup. None block the phase goal.
 
-The 120-test suite is green because `test_lenient_corrupt_journal` only asserts on the `ContaPlusData` returned by `read()` — it never calls `render()`. The test correctly validates D-03 at the data layer but leaves the render layer untested for this case.
-
-**Fix required:**
-1. In `xlsx.py` `render()`, guard the journal sheet: `if data.journal is not None: _render_journal_sheet(ws, data.journal)` else write "Diario" headers only.
-2. Add test: `render(ContaPlusData(journal=None, subcta=<some_table>))` returns valid bytes containing a "Subcuentas" sheet and a "Problemas" sheet.
-
-Secondary items (WR-05 / table-name casing / sheet-count undercount) are warnings that do not block the core conversion path for typical inputs but should be addressed before Phase 4.
+**Test suite:** 124 tests, 0 failures, 0 errors.
 
 ---
 
-_Verified: 2026-05-17_
+_Verified: 2026-05-18_
 _Verifier: Claude (gsd-verifier)_

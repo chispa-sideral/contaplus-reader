@@ -2,15 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: executing
-last_updated: "2026-05-17T21:45:29.909Z"
+status: ready_to_plan
+last_updated: 2026-05-17T22:02:10.917Z
 last_activity: 2026-05-17 -- Phase 03 execution started
 progress:
   total_phases: 5
   completed_phases: 2
   total_plans: 12
-  completed_plans: 11
+  completed_plans: 12
   percent: 40
+stopped_at: Phase 03 complete (5/5) — ready to discuss Phase 4
 ---
 
 # Project State
@@ -20,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-05-15)
 
 **Core value:** Read ContaPlus exports correctly — above all the journal, whose strict validated reading tax-workbench depends on for tax filings.
-**Current focus:** Phase 03 — full-tables-balance-lenient-path
+**Current focus:** Phase 4 — full cli & pypi publication
 
 ## Current Position
 
-Phase: 03 (full-tables-balance-lenient-path) — EXECUTING
-Plan: 1 of 5
-Status: Executing Phase 03
-Last activity: 2026-05-17 -- Phase 03 execution started
+Phase: 4
+Plan: Not started
+Status: Ready to plan
+Last activity: 2026-05-17
 
 Progress: [██████████] 100%
 
@@ -35,7 +36,7 @@ Progress: [██████████] 100%
 
 **Velocity:**
 
-- Total plans completed: 6
+- Total plans completed: 11
 - Average duration: 15 minutes
 - Total execution time: 0.5 hours
 
@@ -45,6 +46,7 @@ Progress: [██████████] 100%
 |-------|-------|-------|----------|
 | 01-journal-slice | 2/3 | 30 min | 15 min |
 | 01 | 4 | - | - |
+| 03 | 5 | - | - |
 
 **Recent Trend:**
 
