@@ -2,291 +2,273 @@
 phase: 03-full-tables-balance-lenient-path
 reviewed: 2026-05-17T00:00:00Z
 depth: standard
-files_reviewed: 11
+files_reviewed: 6
 files_reviewed_list:
-  - src/contaplus_reader/__init__.py
-  - src/contaplus_reader/_balance.py
-  - src/contaplus_reader/_reader.py
-  - src/contaplus_reader/cli.py
-  - src/contaplus_reader/models.py
   - src/contaplus_reader/xlsx.py
-  - tests/conftest.py
-  - tests/test_balance.py
-  - tests/test_lenient.py
-  - tests/test_tables.py
+  - src/contaplus_reader/_reader.py
+  - src/contaplus_reader/__init__.py
+  - src/contaplus_reader/cli.py
   - tests/test_xlsx.py
+  - tests/test_lenient.py
 findings:
-  critical: 2
-  warning: 7
-  info: 5
-  total: 14
+  critical: 0
+  warning: 5
+  info: 4
+  total: 9
 status: issues_found
 ---
 
-# Phase 3: Code Review Report
+# Phase 3: Code Review Report (gap-closure pass, plan 03-05)
 
 **Reviewed:** 2026-05-17
 **Depth:** standard
-**Files Reviewed:** 11
+**Files Reviewed:** 6
 **Status:** issues_found
+
+> This review supersedes the earlier `03-REVIEW.md` (verification-cycle report).
+> It assesses the **plan 03-05 gap-closure diff** since `9b3e91e` — the four
+> fixes that closed WR-06 (blocker), WR-05, the `ProblemEntry.table` casing
+> issue, and the CLI `sheet_count` issue from the prior verification report.
 
 ## Summary
 
-Phase 3 adds operational-table readers (`venci`/`prede`/`amoinv`/`nivel`/`balan`),
-a recomputed trial balance (`_balance.py`), the lenient conversion path, and new
-XLSX sheets. The structural shape is sound and the security posture of
-`_safe_extract_zip` (zip-slip, symlink, zip-bomb guards) is good. However, two
-correctness defects affect the lenient path and one affects the BALAN descuadre
-check — both touch the project's stated core value ("correct extraction cannot
-fail"). The trial-balance computation has a precision defect that contradicts the
-file's own BAL-02 docstring claim.
+The four gap fixes are functionally correct and each closes the behaviour the
+verification report flagged. The WR-06 `journal=None` guard is the most important
+and is covered by two new tests (`test_render_journal_none_produces_valid_workbook`,
+`test_render_lenient_end_to_end`) including an end-to-end corrupt-ZIP path. WR-05's
+`except (ContaPlusReadError, ValueError)` broadening is sound and tested in both
+lenient and strict directions. The casing and `sheet_count` fixes are correct.
 
-Most serious: the lenient secondary-table reader records a `ProblemEntry.table`
-that is inconsistent with how the same table is matched downstream, and
-`compute_balance` widens `Decimal` correctness claims it does not actually keep.
+Adversarial assessment of *how* they were closed surfaces five Warnings and four
+Info items — all quality/robustness defects in the fix code, none a regression of
+the original gaps:
 
-## Critical Issues
+- WR-05's broadened catch wraps the entire `_build_journal_row` call, so a
+  `ValueError` from amount parsing (`float()`) is now downgraded to an opaque
+  `ProblemEntry` with blank `column`/`value` (WR-01).
+- The casing fix canonicalised the `ProblemEntry.table` field but left the
+  `_read_secondary_table` call sites passing inconsistently-cased `table_name`,
+  which still feeds inconsistent casing into user-facing error messages (WR-02).
+- The WR-06 helper `_write_diario_headers_only` duplicates the header/freeze/
+  autosize block of `_render_journal_sheet` verbatim (WR-03) and is typed
+  `ws: Any`, breaking the strict-typing contract the rest of the module keeps
+  (WR-04).
+- The CLI `sheet_count` fix passes `data_only=True` to `load_workbook`, which is a
+  no-op for a sheet-name count and misleads the reader (WR-05).
 
-### CR-01: `compute_balance` re-introduces float error it claims to avoid
-
-**File:** `src/contaplus_reader/_balance.py:56-57`
-**Issue:** The module docstring and inline comments state Decimal accumulation is
-"mandatory" to avoid float binary-representation error (Pitfall 2), and the test
-`test_decimal_precision` asserts `suma_debe == Decimal("0.3")` for inputs
-`0.1 + 0.2`. The conversion `Decimal(str(row.debe))` only produces a clean
-`Decimal("0.1")` because `str(0.1)` is `"0.1"` — but `row.debe` is a `float`
-sourced from `float(record.get(debe_col) or 0)` in `_reader.py:166`. For any DBF
-amount that does not round-trip cleanly through `repr()` (e.g. a value stored as
-`123456789012.34` in an `N(16,2)` field, or any value with >15 significant
-digits), `str(float)` yields a rounded/imprecise decimal string and the
-accumulator silently carries that error. The journal feeds tax filings; a
-cent-level drift on a large account is a correctness failure, not a style issue.
-The root cause is that `debe`/`haber` are stored as `float` on `JournalRow`
-(`models.py:107-108`) — the precision is already lost before `_balance.py` runs.
-**Fix:** Capture the amount as `Decimal` at read time and keep it `Decimal`
-end-to-end. In `_reader.py`, dbfread already decodes `N`-type fields to
-`Decimal`; do not collapse them to `float`:
-```python
-# _reader.py — keep the Decimal dbfread returns
-raw_debe = record.get(debe_col)
-debe = raw_debe if isinstance(raw_debe, Decimal) else Decimal(str(raw_debe or 0))
-```
-and change `JournalRow.debe/haber` to `Decimal`. Then `_balance.py` accumulates
-`Decimal` directly with no `str()` round-trip. If `float` on `JournalRow` must be
-kept for API reasons, document explicitly that balance precision is bounded by
-float53 and drop the "avoids float error" claim from the docstring.
-
-### CR-02: lenient `ProblemEntry.table` for secondary tables is inconsistent and breaks downstream matching
-
-**File:** `src/contaplus_reader/__init__.py:90-98` and `:223-225`
-**Issue:** `_read_secondary_table` builds `ProblemEntry(table=table_name.lower(), ...)`.
-The `balan` call passes `table_name="BALAN.DBF"` (`__init__.py:224`) while every
-other secondary table passes a lowercase name. After `.lower()` the balan entry
-becomes `"balan.dbf"`, which happens to work, but the convention is
-self-contradictory in the same function: the file-level DIARIO error uses
-`table="DIARIO"` (uppercase, `:182` and `:312`), the uncatalogued scan uses
-`candidate.name.upper()` (`:249`), and secondary tables use lowercase. The
-`test_lenient.py` suite papers over this by matching case-insensitively
-(`test_lenient_corrupt_table` uses `e.table.lower() == "venci.dbf"`), so the
-inconsistency is untested and will surface the moment any consumer (the PWA, or
-tax-workbench) filters problems by table name. A `ProblemEntry.table` value that
-depends on which call site produced it is a data-correctness defect in the
-public `ProblemsReport` contract.
-**Fix:** Normalise once. Decide a single canonical form (recommend uppercase
-basename, matching the uncatalogued scan and DIARIO) and apply it in every
-construction site:
-```python
-def _problem_table_name(name: str) -> str:
-    return name.upper()
-# in _read_secondary_table:
-table=_problem_table_name(table_name)
-# DIARIO entries already use "DIARIO"; pass "DIARIO.DBF" if basename form is chosen
-```
-Add a test that asserts the exact `entry.table` string for a corrupt secondary
-table rather than a case-folded substring.
+No Critical issues in the gap-closure diff.
 
 ## Warnings
 
-### WR-01: BALAN descuadre banner crashes on a non-numeric `SDO_CIERRE` cell
+### WR-01: Broadened `ValueError` catch swallows amount-parsing failures as opaque problems
 
-**File:** `src/contaplus_reader/xlsx.py:238-245`
-**Issue:** `_render_balan_sheet` sums `SDO_CIERRE` via
-`Decimal(str(row[sdo_idx])) for row in balan.rows if row[sdo_idx] is not None`.
-The `None` guard is present (T-03-13), but `BALAN.DBF` is read by
-`read_table_raw` which performs no type validation — a `SDO_CIERRE` cell holding
-an empty string `""` (common in DBF character/blank fields) or any non-numeric
-text passes the `is not None` check and reaches `Decimal(str(""))`, which raises
-`decimal.InvalidOperation`. That exception is not a `ContaPlusReadError`, so in
-the CLI it is caught only by the broad `except Exception` in `cli.py:101` and
-shown as an opaque "XLSX Render Error" — and in library use it escapes entirely.
-**Fix:** Coerce defensively and skip uncoercible cells:
+**File:** `src/contaplus_reader/_reader.py:296-317`
+**Issue:** The WR-05 fix broadened the per-row handler to
+`except (ContaPlusReadError, ValueError)`. The `ValueError` branch in lenient mode
+appends a `ProblemEntry` with `column=""`, `value=""` and `reason=str(exc)`, then
+`continue`s. The justifying comment scopes this to "dbfread field deserialization"
+errors — but the `try` wraps the *entire* `_build_journal_row` call, which also
+runs:
+
 ```python
-def _to_decimal(v: object) -> Decimal | None:
-    if v is None or v == "":
-        return None
-    try:
-        return Decimal(str(v))
-    except (InvalidOperation, ValueError):
-        return None
-sdo_sum = sum((d for r in balan.rows
-               if (d := _to_decimal(r[sdo_idx])) is not None), Decimal("0"))
+debe = float(record.get(debe_col) or 0)    # line 166
+haber = float(record.get(haber_col) or 0)  # line 167
 ```
 
-### WR-02: lenient mode silently swallows file-level secondary-table errors with no severity distinction
+If dbfread returns a `debe`/`haber` value that does not coerce (a malformed
+numeric string, or a stray non-numeric character field), `float()` raises a bare
+`ValueError`. That is a genuine, field-attributable data defect — but it now lands
+in the generic `ValueError` branch and is reported with **blank `column` and blank
+`value`**. The Problemas sheet then shows a row the user cannot act on: it does not
+say which field (`debe` vs `haber`) failed or what the offending value was. The
+prior `ContaPlusReadError` path (line 319-333) captures both `exc.column` and
+`_raw_value(record, exc.column)` precisely — the new branch is strictly less
+informative for the same class of error.
 
-**File:** `src/contaplus_reader/__init__.py:87-99`
-**Issue:** In lenient mode `_read_secondary_table` catches every
-`ContaPlusReadError` and turns it into a single `ProblemEntry` with
-`row_index=-1`. A genuinely corrupt operational table (e.g. truncated `amoinv.dbf`)
-and a merely-uncatalogued file both end up as `row_index=-1` entries with no way
-for a consumer to tell "table dropped due to corruption" from "table not
-recognised". Given the project's core value is *correct, visible* extraction,
-collapsing a corruption event into the same shape as an informational notice
-risks a user shipping an incomplete workbook believing nothing was lost.
-**Fix:** Add a `severity` (or `kind`) field to `ProblemEntry` —
-`"error"` for read failures, `"info"` for uncatalogued files — and surface it in
-the Problemas sheet so the distinction reaches the user.
+A secondary hazard: if a `ValueError` ever originates from a logic bug *inside*
+`_build_journal_row` rather than from the data, lenient mode now silently skips the
+row and masks the bug.
 
-### WR-03: `sheet_count` in the CLI success summary is stale and undercounts
+**Fix:** Convert the amount-parsing failures into typed `ContaPlusReadError` inside
+`_build_journal_row` so they keep their column and raw value:
 
-**File:** `src/contaplus_reader/cli.py:126-129`
-**Issue:** The D-16 summary computes `sheet_count` from only
-`[journal, subcta, empresa, grupos, usuarios]` — the five Phase 1/2 tables. Phase 3
-added `balan`, `venci`, `prede`, `amoinv`, `nivel`, `balance_cuenta`,
-`balance_subcuenta`, and the `Problemas` sheet, all of which `render()` emits as
-real sheets (`xlsx.py:94-122`). A full 10-table ZIP reports "5 sheet(s)" while
-the workbook actually contains 13+. The user-facing summary is wrong.
-**Fix:** Count from the same list `render()` iterates, or have `render()` return
-the sheet count alongside the bytes:
 ```python
-sheet_count = sum(t is not None for t in [
-    data.journal, data.subcta, data.balan, data.balance_cuenta,
-    data.balance_subcuenta, data.venci, data.prede, data.amoinv,
-    data.nivel, data.empresa, data.grupos, data.usuarios,
-]) + (1 if data.problems and data.problems.entries else 0)
+raw_debe = record.get(debe_col)
+try:
+    debe = float(raw_debe or 0)
+except (ValueError, TypeError) as exc:
+    raise ContaPlusReadError(
+        row_index=idx, column="debe",
+        message=f"non-numeric debe: {raw_debe!r}",
+    ) from exc
+# ...same for haber...
 ```
 
-### WR-04: uncatalogued-DBF scan can double-report a table that also failed to read
+This leaves the new `ValueError` branch catching only genuine dbfread-internal
+deserialization failures (which are legitimately not field-attributable). At
+minimum, prefix `reason` with the exception type so the Problemas row is not a
+bare message with no context.
 
-**File:** `src/contaplus_reader/__init__.py:240-255`
-**Issue:** The D-13 uncatalogued scan iterates *every* `.dbf` in the company
-directory and reports any whose lowercase name is not in `_CATALOGUE`. It runs
-unconditionally after the secondary-table reads. A catalogued table that failed
-to read already produced a `ProblemEntry` via `_read_secondary_table`; that is
-fine because it is in `_CATALOGUE`. But the scan has no exclusion for the DIARIO
-itself if DIARIO is the only file, and — more importantly — there is no guard
-against the scan running while `diario_path.parent` contains files that were
-just extracted but are *directories* named `*.dbf`; `candidate.is_file()` covers
-that. The real defect: the scan uses `candidate.name.upper()` as the table name,
-diverging from the lowercase convention used three lines earlier for catalogued
-tables (see CR-02). Consistency aside, an archive with both `extra.dbf` and a
-corrupt catalogued table yields two entries with two different casing
-conventions in the same report.
-**Fix:** Resolve alongside CR-02 by normalising all `ProblemEntry.table` values
-through one helper.
+### WR-02: `_read_secondary_table` call sites still pass inconsistently-cased `table_name`
 
-### WR-05: `_read_dbf_path` reads the full DBF inside a single broad `except (struct.error, ValueError, OSError)`
+**File:** `src/contaplus_reader/__init__.py:214-237` (call sites);
+consumed at `src/contaplus_reader/_subcta.py:198`
+**Issue:** The casing fix changed `_read_secondary_table` to build
+`ProblemEntry(table=Path(table_name).stem.upper(), ...)`, which canonicalises the
+*ProblemEntry.table* field. But the eight call sites still pass `table_name` with
+mixed casing:
 
-**File:** `src/contaplus_reader/_reader.py:269-358`
-**Issue:** The entire per-row iteration loop (`for idx, record in enumerate(table)`)
-runs inside the outer `try` whose handler catches `ValueError`. dbfread can raise
-`ValueError` mid-iteration on a malformed record. In lenient mode the intent is
-that per-row problems become `ProblemEntry` records and iteration continues — but
-a `ValueError` raised by dbfread itself (not a `ContaPlusReadError`) escapes the
-inner per-row `except ContaPlusReadError` and is caught by the outer handler,
-which converts it to a *file-level* `ContaPlusReadError`. Result: one malformed
-record aborts the whole journal even in lenient mode, contradicting D-02. The
-lenient path's robustness depends on dbfread never raising a bare `ValueError`
-during iteration, which is not guaranteed.
-**Fix:** Wrap the per-record body in a `try/except (ValueError, struct.error)`
-that, in lenient mode, emits a `ProblemEntry` and `continue`s; keep the outer
-handler for open-time / header-parse failures only.
-
-### WR-06: `render()` uses `wb.active` without confirming the active sheet exists
-
-**File:** `src/contaplus_reader/xlsx.py:84-87`
-**Issue:** `_render_journal_sheet(wb.active, data.journal)` is annotated
-`# type: ignore[arg-type]` because `wb.active` is `Worksheet | None`. The
-`type: ignore` suppresses the warning but does not make the call safe — and
-`data.journal` is typed `ContaPlusJournal | None`. In lenient mode `data.journal`
-can legitimately be `None` (D-03: wholly-unreadable DIARIO). `_render_journal_sheet`
-then iterates `journal.rows` on `None` and raises `AttributeError`. The lenient
-path is specifically designed to continue after a dead journal, so a lenient
-conversion of a corrupt-DIARIO ZIP will crash in the renderer instead of
-producing a workbook with an empty Diario sheet plus the other tables.
-**Fix:** Guard the journal sheet:
 ```python
-ws = wb.active
+balan_path,  "BALAN.DBF",  ...   # uppercase
+venci_path,  "venci.dbf",  ...   # lowercase
+grupos_path, "grupos.dbf", ...   # lowercase
+```
+
+`table_name` is forwarded verbatim into `read_table_raw(path, table_name)`, where
+it is interpolated into the user-facing error message
+`f"{table_name} read error: {exc}"` (`_subcta.py:198`). So a corrupt BALAN reports
+`BALAN.DBF read error: ...` while a corrupt VENCI reports `venci.dbf read error:
+...` — inconsistent error text in the same conversion. The `.stem.upper()` only
+normalises the `table` column of the `ProblemEntry`, not the `reason` text that is
+built from the raw `table_name`. The fix masked half the inconsistency and left
+the other half live.
+
+**Fix:** Make all eight call sites use one casing. Lowercase matches `_CATALOGUE`
+and the actual extracted filenames:
+
+```python
+balan = _read_secondary_table(
+    balan_path, "balan.dbf", lenient=lenient, problems=collected_problems
+)
+```
+
+`_read_secondary_table` already applies `.stem.upper()` for the ProblemEntry, so
+the only consumer sensitive to the raw casing is the error message — normalising
+the inputs fixes it.
+
+### WR-03: `_write_diario_headers_only` duplicates `_render_journal_sheet`'s header block verbatim
+
+**File:** `src/contaplus_reader/xlsx.py:183-201` vs `150-180`
+**Issue:** The WR-06 fix added `_write_diario_headers_only`. Its entire body — the
+`for col_idx, header in enumerate(HEADERS, 1)` styling loop, `ws.freeze_panes =
+"A2"`, and `_autosize_columns(ws)` — is a verbatim copy of lines 159-165 + 180 of
+`_render_journal_sheet`. The code comment admits it: "identical to
+`_render_journal_sheet` row 1". Any future change to header styling, the freeze
+cell, or the autosize policy must be applied to both functions in lockstep — a
+drift hazard. `_render_journal_sheet` already handles the zero-row case correctly:
+`enumerate(journal.rows, 2)` over an empty tuple writes no data rows.
+
+**Fix:** Delete `_write_diario_headers_only` and reuse the existing renderer with
+an empty journal:
+
+```python
 if data.journal is not None:
-    _render_journal_sheet(ws, data.journal)
+    _render_journal_sheet(wb.active, data.journal)
 else:
-    ws.title = "Diario"
-    # write headers only
+    # D-03 lenient path: corrupt DIARIO -> headers-only Diario sheet.
+    _render_journal_sheet(wb.active, ContaPlusJournal(rows=()))
 ```
-Add a test: `render()` on a `ContaPlusData(journal=None, subcta=...)`.
 
-### WR-07: `JournalRow.subcuenta_nombre` enrichment miss-rate is logged but never surfaced in lenient `problems`
+`ContaPlusJournal` is already imported (`xlsx.py:27`) and `rows=()` is valid with
+its other fields defaulted. This removes ~19 lines and guarantees the headers-only
+sheet stays byte-identical to a real Diario header row.
 
-**File:** `src/contaplus_reader/_reader.py:327-335`
-**Issue:** WR-04's enrichment-miss counter is computed and logged at `INFO`, but
-in lenient mode — where the explicit goal is to surface every data-quality issue
-to the user via the Problemas sheet — a near-total enrichment miss (the comment
-itself says this "likely signals a key-normalisation bug") produces no
-`ProblemEntry`. A user converting in the PWA never sees the log. The diagnostic
-exists but is invisible to the audience that needs it.
-**Fix:** When `lenient=True` and the miss rate exceeds a threshold, append one
-informational `ProblemEntry` (`table="SUBCTA"`, `row_index=-1`) summarising the
-miss count.
+### WR-04: `_write_diario_headers_only` typed `ws: Any` — breaks the module's strict-typing convention
+
+**File:** `src/contaplus_reader/xlsx.py:183` (`ws: Any`); also `367`, `381`
+**Issue:** CLAUDE.md mandates strict typing with no `any`. Every other render
+helper in this file (`_render_journal_sheet`, `_render_subcta_sheet`,
+`_render_generic_sheet`, `_render_balan_sheet`, `_render_balance_sheet`,
+`_render_problems_sheet`) is annotated `ws: Worksheet`. The new WR-06 helper
+`_write_diario_headers_only` was added at `ws: Any`, as were the two autosize
+helpers it calls. `Any` disables the type checker exactly where the new gap-fix
+code runs — `wb.active` is `Worksheet | None` in openpyxl's stubs, and passing it
+into an `Any`-typed parameter silences a legitimate `None`-safety warning. The
+`Worksheet` type is already imported (`xlsx.py:23`).
+
+**Fix:** Annotate `_write_diario_headers_only`, `_autosize_columns`, and
+`_autosize_columns_from_offset` as `ws: Worksheet` to match the rest of the module.
+They are only ever called with a writable `Worksheet`.
+
+### WR-05: CLI passes `data_only=True` to `load_workbook` for a sheet-name count — a no-op and misleading
+
+**File:** `src/contaplus_reader/cli.py:127-129`
+**Issue:** The `sheet_count` fix uses
+`load_workbook(_io.BytesIO(xlsx_bytes), read_only=True, data_only=True).sheetnames`.
+`data_only=True` tells openpyxl to return cached cell *values* instead of formulas
+— it has zero effect on `.sheetnames` and zero effect when only sheet names are
+read. Its presence signals an intent (inspecting cell values) that does not exist
+and will mislead the next maintainer. Separately, re-parsing the freshly-written
+xlsx purely to `len(...sheetnames)` is wasteful and couples the CLI summary to a
+clean round-trip of the file it just produced.
+
+**Fix:** Drop `data_only=True`. Better, avoid the re-parse entirely by having
+`render()` return the sheet names (or count) alongside the bytes so the summary is
+authoritative:
+
+```python
+sheet_count = len(_load_wb(_io.BytesIO(xlsx_bytes), read_only=True).sheetnames)
+```
 
 ## Info
 
-### IN-01: `tempfile` import in `__init__.py` is fine, but `Path` import used only in a type position
+### IN-01: CLI imports placed mid-function, inconsistent with the file's deferred-import grouping
 
-**File:** `src/contaplus_reader/__init__.py:16-18`
-**Issue:** `tempfile`, `Path`, `BinaryIO` are all used; no dead import. However
-`from __future__ import annotations` is present so `Path` in `_read_secondary_table`'s
-signature is a string at runtime — the import is only needed for the
-`Path(tmpdir_str)` call at line 155, which is correct. No action needed; noted to
-confirm it was checked.
+**File:** `src/contaplus_reader/cli.py:127-128`
+**Issue:** `import io as _io` and `from openpyxl import load_workbook as _load_wb`
+are placed two-thirds of the way down `main()`, after several statements. The file
+already uses deferred imports (`from contaplus_reader import ...` at line 54) to
+keep CLI startup fast — but those are grouped at the *start* of the function.
+Burying two more imports mid-body with underscore-prefixed aliases reads as a
+hurried patch.
+**Fix:** Move both imports up with the other deferred imports at the top of
+`main()`.
 
-### IN-02: magic-number decompression caps are module constants — good, but undocumented unit rationale
+### IN-02: `ProblemEntry` docstring example is stale after the casing fix
 
-**File:** `src/contaplus_reader/_zip.py:29-31`
-**Issue:** `_MAX_TOTAL_UNCOMPRESSED = 500 MB`, `_MAX_ENTRY_COUNT = 10_000`,
-`_MAX_COMPRESSION_RATIO = 200` are sensible and named, but there is no comment on
-why 500 MB / 200:1 specifically (a real ContaPlus multi-year archive size would
-justify the number).
-**Fix:** Add a one-line comment citing the largest observed real archive so a
-future maintainer does not lower the cap below a legitimate file.
+**File:** `src/contaplus_reader/models.py:171`
+**Issue:** `ProblemEntry.table`'s docstring says
+`table: logical table name (e.g. "DIARIO", "venci.dbf")`. After the casing fix,
+secondary tables are emitted as uppercase stems (`"VENCI"`, never `"venci.dbf"`).
+The example now contradicts the canonical form the code produces.
+**Fix:** Update the example to `"DIARIO"`, `"VENCI"`.
 
-### IN-03: `_raw_value` defensively handles non-`get` records but `_build_journal_row` does not
+### IN-03: `_raw_value` `type: ignore[union-attr]` redundant with its own runtime guard
 
-**File:** `src/contaplus_reader/_reader.py:108-117` vs `:157`
-**Issue:** `_raw_value` checks `hasattr(record, "get")` before calling `.get`,
-but `_build_journal_row` calls `record.get("fecha")` directly with a
-`# type: ignore[union-attr]`. The two helpers disagree on whether `record` is
-trusted to have `.get`. dbfread records are dict-like so this is fine in
-practice; the inconsistency is cosmetic.
-**Fix:** Pick one assumption. Since dbfread guarantees a mapping, drop the
-`hasattr` check in `_raw_value` for consistency.
+**File:** `src/contaplus_reader/_reader.py:108-117`
+**Issue:** `_raw_value` does `if hasattr(record, "get"): return str(record.get(...))`
+with a trailing `# type: ignore[union-attr]`. The `hasattr` already narrows at
+runtime; the `type: ignore` exists only because `record` is statically typed
+`object`. CLAUDE.md discourages loose `type: ignore`. Typing `record` as a
+`Mapping[str, object]` protocol (or the dbfread record type) would let the ignore
+be dropped. Pre-existing, but the WR-05 work touched the surrounding function.
+**Fix:** Type `record` precisely and remove the ignore; low priority.
 
-### IN-04: test helpers construct `JournalRow` without `subcuenta_nombre` — relies on default
+### IN-04: `_assert_journal_shaped` re-declares amount-column sets that duplicate module constants
 
-**File:** `tests/test_balance.py:32-41`, `tests/test_xlsx.py:32-40`
-**Issue:** `_make_row` / `_sample_row` omit `subcuenta_nombre`, relying on the
-`= None` default. Correct today, but if the field's default is ever removed the
-failure is a collection-time `TypeError` across many tests. Low risk.
-**Fix:** None required; acceptable for test code.
+**File:** `src/contaplus_reader/_reader.py:94-95`
+**Issue:** `_assert_journal_shaped` declares local `_DEBE`/`_HABER` sets that
+duplicate the module-level `_DEBE_COL_CANDIDATES`/`_HABER_COL_CANDIDATES` tuples
+(lines 32-33). If a new amount-column variant is added to the canonical tuples but
+not the local sets, the shape check and the column picker disagree. Pre-existing,
+low severity.
+**Fix:** Derive the assertion sets from the canonical tuples:
+`set(_DEBE_COL_CANDIDATES)`.
 
-### IN-05: `_autosize_columns` and `_autosize_columns_from_offset` are near-duplicates
+---
 
-**File:** `src/contaplus_reader/xlsx.py:341-377`
-**Issue:** The two functions differ only in the `if c.row >= start_row` filter
-and the column-letter source (`col_cells[0].column_letter` vs
-`get_column_letter(col_idx)`). The duplication is a maintenance hazard — a future
-fix to the width cap must be applied twice.
-**Fix:** Collapse into one function with a `start_row: int = 1` parameter and use
-`get_column_letter(col_idx)` uniformly.
+## Gap-closure verdict
+
+| Gap (from 03-VERIFICATION.md) | Closed? | Residual finding |
+|-------------------------------|---------|------------------|
+| WR-06 — `render()` crash on `journal=None` | Yes — guarded, tested end-to-end | WR-03 (duplication), WR-04 (typing) |
+| WR-05 — `ValueError` escapes per-row handler | Yes — `except (ContaPlusReadError, ValueError)`, tested both modes | WR-01 (over-catch, opaque ProblemEntry) |
+| `ProblemEntry.table` casing | Yes — for the `table` field | WR-02 (call-site casing still inconsistent in error text) |
+| CLI `sheet_count` undercount | Yes — derived from rendered workbook | WR-05 (no-op `data_only`), IN-01 (import placement) |
+
+All four gaps are genuinely closed for the behaviour the verification report
+flagged; no regression detected. The residual findings are quality and robustness
+defects in the fix code, not reopened gaps.
 
 ---
 
