@@ -89,7 +89,7 @@ Plans:
 - [x] 03-02-PLAN.md — models.py Phase 3 types (ProblemEntry, BalanceRow, BalanceTable), new _balance.py (compute_balance Decimal), _reader.py lenient extension (_build_journal_row + lenient/problems params)
 
 **Wave 3** *(blocked on Wave 2 completion)*
-- [ ] 03-03-PLAN.md — __init__.py: lenient parameter, 10-table catalogue, problems collection, balance computation, uncatalogued-DBF scan
+- [x] 03-03-PLAN.md — __init__.py: lenient parameter, 10-table catalogue, problems collection, balance computation, uncatalogued-DBF scan
 
 **Wave 4** *(blocked on Wave 3 completion)*
 - [ ] 03-04-PLAN.md — xlsx.py Phase 3 renderers (_render_balan_sheet conditional banner, _render_balance_sheet, _render_problems_sheet, render() sheet order) + cli.py --lenient flag
@@ -128,6 +128,6 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 |-------|----------------|--------|-----------|
 | 1. Journal Slice | 4/4 | Complete   | 2026-05-15 |
 | 2. ZIP & Subaccounts | 3/3 | Complete   | 2026-05-16 |
-| 3. Full Tables, Balance & Lenient Path | 2/4 | In Progress|  |
+| 3. Full Tables, Balance & Lenient Path | 3/4 | In Progress|  |
 | 4. Full CLI & PyPI Publication | 0/TBD | Not started | - |
 | 5. Browser PWA | 0/TBD | Not started | - |
