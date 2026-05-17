@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import datetime
 from dataclasses import dataclass
+from decimal import Decimal
 
 
 import dataclasses as _dataclasses
@@ -164,11 +165,76 @@ class GenericTable:
     source_name: str | None = None
 
 
+@dataclass(frozen=True)
+class ProblemEntry:
+    """One problem record from the lenient conversion path (API-03 D-02..D-05).
+
+    table: logical table name (e.g. "DIARIO", "venci.dbf").
+    row_index: 0-based row index within the table; -1 = file-level error.
+    column: field/column name involved, or "" when not row-specific.
+    reason: human-readable description of the problem.
+    value: the raw field value that caused the problem (as string), or "".
+    """
+
+    table: str
+    row_index: int
+    column: str
+    reason: str
+    value: str
+
+
+@dataclass(frozen=True)
+class ProblemsReport:
+    """Collection of problem entries from the lenient conversion path (API-03).
+
+    entries: immutable tuple of all ProblemEntry records collected during
+             a lenient read() call.
+    """
+
+    entries: tuple[ProblemEntry, ...]
+
+
+@dataclass(frozen=True)
+class BalanceRow:
+    """One row of the trial balance (sumas y saldos) for a single account code.
+
+    code: account code (4-digit cuenta code or full subcuenta code).
+    suma_debe: sum of all debe amounts, computed via Decimal(str(float)) (BAL-02).
+    suma_haber: sum of all haber amounts, computed via Decimal(str(float)) (BAL-02).
+    saldo_deudor: max(suma_debe - suma_haber, Decimal("0")) (D-08).
+    saldo_acreedor: max(suma_haber - suma_debe, Decimal("0")) (D-08).
+    saldo: suma_debe - suma_haber; positive = deudor, negative = acreedor (D-08).
+    descripcion: subaccount description from subcta_lookup, or None.
+    """
+
+    code: str
+    suma_debe: Decimal
+    suma_haber: Decimal
+    saldo_deudor: Decimal
+    saldo_acreedor: Decimal
+    saldo: Decimal
+    descripcion: str | None = None
+
+
+@dataclass(frozen=True)
+class BalanceTable:
+    """Trial balance (sumas y saldos) for a full journal.
+
+    rows: tuple of BalanceRow, sorted ascending by code.
+    level: "cuenta" when grouped by 4-digit cuenta; "subcuenta" when grouped by
+           full subcuenta code.
+    """
+
+    rows: tuple[BalanceRow, ...]
+    level: str
+
+
 @dataclass
 class ContaPlusData:
     """Container for all extracted ContaPlus tables.
 
     Phase 1 populates .journal only. Phase 2 adds .subcta/.empresa/.grupos/.usuarios.
+    Phase 3 adds .balan/.venci/.prede/.amoinv/.nivel/.balance_cuenta/.balance_subcuenta/.problems.
     NOT frozen -- grows new attributes in Phases 2-3.
     """
 
@@ -177,3 +243,14 @@ class ContaPlusData:
     empresa: GenericTable | None = None  # D-05: present when empresa.dbf found
     grupos: GenericTable | None = None   # D-05: present when grupos.dbf found
     usuarios: GenericTable | None = None  # D-05: present when usuarios.dbf found
+    # Phase 3 operational tables (TABL-03)
+    balan: GenericTable | None = None    # BALAN.DBF — ContaPlus balance structure
+    venci: GenericTable | None = None    # venci.dbf — bill maturity table
+    prede: GenericTable | None = None    # prede.dbf — recurring entry templates
+    amoinv: GenericTable | None = None   # amoinv.dbf — amortisation/investment table
+    nivel: GenericTable | None = None    # nivel.dbf — account level configuration
+    # Phase 3 computed trial balance (BAL-02)
+    balance_cuenta: BalanceTable | None = None
+    balance_subcuenta: BalanceTable | None = None
+    # Phase 3 lenient path problems report (API-03)
+    problems: ProblemsReport | None = None
