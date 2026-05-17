@@ -293,7 +293,29 @@ def _read_dbf_path(
                     record, idx, debe_col, haber_col, subcta_lookup,
                     enrichment_misses_ref,
                 )
-            except ContaPlusReadError as exc:
+            except (ContaPlusReadError, ValueError) as exc:
+                if isinstance(exc, ValueError):
+                    # WR-05: dbfread can raise ValueError during field deserialization
+                    # (type mismatch, struct decode failure at the record level).
+                    # These are per-row failures, not file-level failures.
+                    # In lenient mode: collect as a ProblemEntry and skip the row.
+                    # In strict mode: re-raise so the outer except (struct.error,
+                    # ValueError, OSError) handler wraps it as a file-level
+                    # ContaPlusReadError (existing strict behaviour, unchanged).
+                    if lenient:
+                        if problems is not None:
+                            problems.append(
+                                ProblemEntry(
+                                    table="DIARIO",
+                                    row_index=idx,
+                                    column="",
+                                    reason=str(exc),
+                                    value="",
+                                )
+                            )
+                        continue
+                    raise
+                # ContaPlusReadError path (original logic).
                 if lenient and exc.row_index >= 0:
                     # Per-row error in lenient mode: collect and skip (D-02)
                     # D-05: memo skips (row=None) are NOT collected here;

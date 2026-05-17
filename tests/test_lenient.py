@@ -111,7 +111,7 @@ def test_lenient_corrupt_table(tmp_path: Path) -> None:
     assert getattr(data, "venci", "MISSING") is None
     assert data.problems is not None
     assert any(
-        e.table.lower() == "venci.dbf" and e.row_index == -1
+        e.table == "VENCI" and e.row_index == -1
         for e in data.problems.entries
     )
 
@@ -170,7 +170,7 @@ def test_lenient_uncatalogued_dbf(zip_with_uncatalogued: Path) -> None:
     assert data.problems is not None
     matching = [
         e for e in data.problems.entries
-        if e.table.upper() == "EXTRA.DBF" and e.row_index == -1
+        if e.table == "EXTRA" and e.row_index == -1
     ]
     assert len(matching) == 1
     assert "unrecognized" in matching[0].reason.lower()
