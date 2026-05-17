@@ -27,6 +27,10 @@ else (CLI, PWA, styling) is delivery; correct extraction cannot fail.
 
 - [x] Typed per-table reader for the journal (`DIARIO.DBF`) porting all existing `tw-contaplus` business rules (D-A1…D-E3) and the structured error model — *Validated in Phase 1: Journal Slice*
 - [x] `ContaPlusReadError` — structured error carrying row/column/context, no dependency on `tw-domain` — *Validated in Phase 1: Journal Slice*
+- [x] Typed per-table readers for the other known ContaPlus tables (`SUBCTA.DBF`, `BALAN.DBF`, `venci`/`prede`/`amoinv`/`nivel`, group-level tables) — schemas enumerated against real archives — *Validated in Phase 3: Full Tables, Balance & Lenient Path*
+- [x] Strict typed API path — fails loudly on invalid data (preserves tax-workbench's contract) — *journal path Phase 1; all other tables Validated in Phase 3*
+- [x] Lenient conversion path — extracts what it can, collects problems into a report, never aborts the whole file — *Validated in Phase 3: Full Tables, Balance & Lenient Path*
+- [x] Self-contained result model (`ContaPlusJournal` and sibling per-table types) — no `tw-domain` types — *`ContaPlusJournal` Phase 1; sibling types Validated in Phase 3*
 
 ### Active
 
@@ -35,12 +39,8 @@ else (CLI, PWA, styling) is delivery; correct extraction cannot fail.
 **Library — reader core**
 
 - [ ] Single bytes-first read API accepts raw `.dbf` or backup `.zip` (file-like / bytes, no filesystem path required) — *`.dbf` path shipped in Phase 1; `.zip` pending Phase 2*
-- [ ] Typed per-table readers for the other known ContaPlus tables (`SUBCTA.DBF`, `BALAN.DBF`, group-level tables) — schemas to be enumerated during research
-- [ ] Strict typed API path — fails loudly on invalid data (preserves tax-workbench's contract) — *journal path shipped in Phase 1; other tables pending*
-- [ ] Lenient conversion path — extracts what it can, collects problems into a report, never aborts the whole file
 - [ ] Journal output enriched with account/subaccount names when `SUBCTA.DBF` is present in a `.zip` (additive)
 - [ ] ZIP handling: zip-slip-safe extraction from an in-memory buffer; recursive `DIARIO.DBF` discovery; multi-company disambiguation
-- [ ] Self-contained result model (`ContaPlusJournal` and sibling per-table types) — no `tw-domain` types — *`ContaPlusJournal` shipped in Phase 1; sibling types pending*
 
 **XLSX rendering**
 
@@ -148,4 +148,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-05-15 after Phase 1 (Journal Slice) completion*
+*Last updated: 2026-05-18 after Phase 3 (Full Tables, Balance & Lenient Path) completion*
