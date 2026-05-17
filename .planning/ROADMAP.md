@@ -77,9 +77,22 @@ Plans:
 **Success Criteria** (what must be TRUE):
   1. A backup ZIP converted with the lenient flag produces a `.xlsx` that includes sheets for `venci`, `prede`, `amoinv`, and `nivel`
   2. The `.xlsx` contains a problems sheet listing every row the lenient path flagged or skipped, with row and column context
-  3. The `BALAN` sheet carries a visible "derived — may be unreliable" disclaimer; the recomputed trial-balance sheet is presented as authoritative
+  3. The `BALAN` sheet carries a "derived — may be unreliable" disclaimer only when its own figures fail to balance (D-09 refinement); the two recomputed trial-balance sheets — cuenta-level and subcuenta-level — are always present and authoritative (D-07 refinement)
   4. Field schemas for `venci`, `prede`, `amoinv`, and `nivel` are validated against `pii-test-data/` archives before typed readers are committed
-**Plans**: TBD
+**Plans**: 4 plans
+
+Plans:
+**Wave 1**
+- [ ] 03-01-PLAN.md — Test scaffold: conftest fixtures (venci/prede/amoinv/nivel/balan/lenient DBFs) + failing tests for all Phase 3 behaviors
+
+**Wave 2** *(blocked on Wave 1 completion)*
+- [ ] 03-02-PLAN.md — models.py Phase 3 types (ProblemEntry, BalanceRow, BalanceTable), new _balance.py (compute_balance Decimal), _reader.py lenient extension (_build_journal_row + lenient/problems params)
+
+**Wave 3** *(blocked on Wave 2 completion)*
+- [ ] 03-03-PLAN.md — __init__.py: lenient parameter, 10-table catalogue, problems collection, balance computation, uncatalogued-DBF scan
+
+**Wave 4** *(blocked on Wave 3 completion)*
+- [ ] 03-04-PLAN.md — xlsx.py Phase 3 renderers (_render_balan_sheet conditional banner, _render_balance_sheet, _render_problems_sheet, render() sheet order) + cli.py --lenient flag
 
 ### Phase 4: Full CLI & PyPI Publication
 **Goal**: The tool is installable from PyPI, the CLI handles all v1 options, and the published wheel is ready for `micropip` consumption by the PWA
@@ -115,6 +128,6 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 |-------|----------------|--------|-----------|
 | 1. Journal Slice | 4/4 | Complete   | 2026-05-15 |
 | 2. ZIP & Subaccounts | 3/3 | Complete   | 2026-05-16 |
-| 3. Full Tables, Balance & Lenient Path | 0/TBD | Not started | - |
+| 3. Full Tables, Balance & Lenient Path | 0/4 | Not started | - |
 | 4. Full CLI & PyPI Publication | 0/TBD | Not started | - |
 | 5. Browser PWA | 0/TBD | Not started | - |
