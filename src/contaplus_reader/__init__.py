@@ -27,6 +27,8 @@ from contaplus_reader.models import (
     ContaPlusJournal,
     ContaPlusReadError,
     JournalRow,
+    ProblemEntry,
+    ProblemsReport,
 )
 
 __all__ = [
@@ -42,6 +44,8 @@ def read(
     data: bytes | BinaryIO,
     source_name: str | None = None,
     company: str | None = None,
+    *,
+    lenient: bool = False,
 ) -> ContaPlusData:
     """Read a ContaPlus file from bytes or a file-like object.
 
@@ -55,14 +59,21 @@ def read(
         company: Company directory name for multi-company ZIP archives (D-04).
                  Example: "Emp01". Required when ZIP contains multiple companies.
                  Not applicable to raw DBF input (raises ContaPlusReadError if supplied).
+        lenient: If True, per-row journal errors are collected into
+                 ContaPlusData.problems rather than raising ContaPlusReadError.
+                 File-level errors (row_index == -1) always propagate.
+                 Default False (strict mode -- unchanged behaviour for existing callers).
 
     Returns:
         ContaPlusData with .journal populated (ContaPlusJournal).
         For ZIP input: .subcta, .empresa, .grupos, .usuarios also populated
         when the corresponding DBF files are present in the archive.
+        When lenient=True: .problems is a ProblemsReport if any issues were
+        collected; None if the input was clean.
 
     Raises:
-        ContaPlusReadError: On any invalid input, malformed DBF, or bad journal row.
+        ContaPlusReadError: On any invalid input, malformed DBF, or bad journal row
+                            (strict mode), or on file-level errors in lenient mode.
                             Also raised when company= is required but not supplied
                             (multi-company ZIP), or when company= is supplied on
                             a raw DBF input.
@@ -71,6 +82,9 @@ def read(
     raw: bytes = data if isinstance(data, bytes) else data.read()
 
     fmt = sniff(raw)  # returns "dbf" or "zip"; raises on unrecognised format
+
+    # Lenient mode: accumulate ProblemEntry records across the whole conversion.
+    collected_problems: list[ProblemEntry] = [] if lenient else []
 
     if fmt == "zip":
         # ZIP path -- TemporaryDirectory lifecycle owned here (RESEARCH.md Pitfall 1)
@@ -86,11 +100,13 @@ def read(
             )
             subcta_table = read_subcta_table(subcta_path) if subcta_path else None
 
-            # Journal read with enrichment
+            # Journal read with enrichment (lenient mode passes problem collector)
             journal = _read_dbf_path(
                 diario_path,
                 source_name=source_name,
                 subcta_lookup=lookup,
+                lenient=lenient,
+                problems=collected_problems if lenient else None,
             )
 
             # Optional group tables (D-05/D-06): absent -> None, present -> GenericTable
@@ -106,12 +122,19 @@ def read(
                 read_table_raw(empresa_path, "empresa.dbf") if empresa_path else None
             )
 
+            problems_report = (
+                ProblemsReport(entries=tuple(collected_problems))
+                if collected_problems
+                else None
+            )
+
             return ContaPlusData(
                 journal=journal,
                 subcta=subcta_table,
                 empresa=empresa,
                 grupos=grupos,
                 usuarios=usuarios,
+                problems=problems_report,
             )
     else:
         # DBF path (unchanged from Phase 1, uses bytes_to_tmppath bridge)
@@ -122,5 +145,16 @@ def read(
                 message="company selector is not applicable to a raw DBF input",
             )
         with bytes_to_tmppath(raw) as path:
-            journal = _read_dbf_path(path, source_name=source_name)
-        return ContaPlusData(journal=journal)
+            journal = _read_dbf_path(
+                path,
+                source_name=source_name,
+                lenient=lenient,
+                problems=collected_problems if lenient else None,
+            )
+
+        problems_report = (
+            ProblemsReport(entries=tuple(collected_problems))
+            if collected_problems
+            else None
+        )
+        return ContaPlusData(journal=journal, problems=problems_report)
