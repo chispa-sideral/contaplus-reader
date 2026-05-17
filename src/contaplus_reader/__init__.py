@@ -89,7 +89,7 @@ def _read_secondary_table(
     except ContaPlusReadError as exc:
         problems.append(
             ProblemEntry(
-                table=table_name.lower(),
+                table=Path(table_name).stem.upper(),
                 row_index=-1,
                 column="",
                 reason=exc.message,
@@ -246,7 +246,7 @@ def read(
                     ):
                         collected_problems.append(
                             ProblemEntry(
-                                table=candidate.name.upper(),
+                                table=candidate.stem.upper(),
                                 row_index=-1,
                                 column="",
                                 reason="unrecognized table — not extracted",

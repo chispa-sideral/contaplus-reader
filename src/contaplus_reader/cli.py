@@ -121,12 +121,14 @@ def main(
         raise typer.Exit(1) from None
 
     # D-16: Concise success summary with row count, sheet count, and optional skip count.
+    # WR-07: derive sheet_count from the rendered workbook so it always matches the
+    # actual number of sheets produced by render(), regardless of which tables are
+    # present (Phase 3 adds balan, venci, prede, amoinv, nivel, balance sheets, etc.).
+    import io as _io
+    from openpyxl import load_workbook as _load_wb
+    sheet_count = len(_load_wb(_io.BytesIO(xlsx_bytes), read_only=True, data_only=True).sheetnames)
     journal = data.journal
     row_count = len(journal.rows) if journal else 0
-    sheet_count = sum(
-        1 for t in [data.journal, data.subcta, data.empresa, data.grupos, data.usuarios]
-        if t is not None
-    )
     skip_msg = (
         f" ({journal.skipped_memo} memo lines skipped)"
         if journal and journal.skipped_memo

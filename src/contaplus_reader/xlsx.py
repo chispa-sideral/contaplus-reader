@@ -84,7 +84,12 @@ def render(data: ContaPlusData) -> bytes:
     wb = Workbook()
 
     # Sheet 1: Diario (always present -- wb.active is sheet 1).
-    _render_journal_sheet(wb.active, data.journal)  # type: ignore[arg-type]
+    # WR-06: guard against journal=None (D-03 lenient path produces journal=None
+    # for wholly-corrupt DIARIO archives). When None, write headers only.
+    if data.journal is not None:
+        _render_journal_sheet(wb.active, data.journal)
+    else:
+        _write_diario_headers_only(wb.active)
 
     if data.subcta is not None:
         _render_subcta_sheet(wb.create_sheet("Subcuentas"), data.subcta)
@@ -172,6 +177,27 @@ def _render_journal_sheet(ws: Worksheet, journal: ContaPlusJournal) -> None:
 
     # D-10: Auto-size columns (openpyxl has no built-in autofit).
     # Pitfall 4: use col_cells[0].column_letter, NOT col_cells.column_letter.
+    _autosize_columns(ws)
+
+
+def _write_diario_headers_only(ws: Any) -> None:
+    """Write a headers-only Diario sheet with no data rows.
+
+    Used when data.journal is None (D-03 lenient path: corrupt DIARIO archive).
+    Sets the sheet title to 'Diario', writes HEADERS in row 1 with D-10 styling,
+    freezes pane at A2, and auto-sizes columns. No data rows are written.
+    """
+    ws.title = "Diario"
+
+    # Header row (row 1) with D-10 styling -- identical to _render_journal_sheet row 1.
+    for col_idx, header in enumerate(HEADERS, 1):
+        cell = ws.cell(row=1, column=col_idx, value=header)
+        cell.fill = HEADER_FILL
+        cell.font = HEADER_FONT
+
+    # D-10: Freeze header row.
+    ws.freeze_panes = "A2"
+
     _autosize_columns(ws)
 
 

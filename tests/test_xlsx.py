@@ -825,3 +825,108 @@ def test_balance_cuenta_columns() -> None:
         "Cuenta", "Suma Debe", "Suma Haber",
         "Saldo Deudor", "Saldo Acreedor", "Saldo",
     ]
+
+
+# ===========================================================================
+# Phase 3 gap-closure tests (plan 03-05) -- WR-06 fix + D-03 end-to-end
+# ===========================================================================
+
+def test_render_journal_none_produces_valid_workbook() -> None:
+    """WR-06: render(ContaPlusData(journal=None, ...)) must not raise.
+
+    When the lenient read path produces journal=None (corrupt DIARIO), render()
+    must still produce a valid workbook with a Diario sheet (headers only),
+    a Subcuentas sheet, and a Problemas sheet.
+
+    RED: render() unconditionally calls _render_journal_sheet(wb.active, data.journal)
+         which raises AttributeError: 'NoneType' object has no attribute 'rows'.
+    GREEN when: render() has a None guard for data.journal.
+    """
+    from contaplus_reader.models import (
+        ContaPlusData,
+        ProblemEntry,
+        ProblemsReport,
+        SubctaRow,
+        SubctaTable,
+    )
+    from contaplus_reader.xlsx import render
+
+    subcta = SubctaTable(
+        headers=("COD", "TITULO"),
+        rows=(SubctaRow(fields={"COD": "4300000", "TITULO": "Cliente"}),),
+        source_name=None,
+    )
+    problem_entry = ProblemEntry(
+        table="DIARIO",
+        row_index=-1,
+        column="",
+        reason="corrupt",
+        value="",
+    )
+    problems = ProblemsReport(entries=(problem_entry,))
+    data = ContaPlusData(journal=None, subcta=subcta, problems=problems)
+
+    result = render(data)
+    assert isinstance(result, bytes)
+    assert len(result) > 0
+
+    wb = load_workbook(io.BytesIO(result))
+    assert "Diario" in wb.sheetnames, f"Expected 'Diario' sheet, got: {wb.sheetnames}"
+    assert wb["Diario"].max_row == 1, (
+        f"Expected Diario headers-only (max_row=1), got max_row={wb['Diario'].max_row}"
+    )
+    assert wb["Diario"]["A1"].value == "Fecha", (
+        f"Expected first header 'Fecha', got {wb['Diario']['A1'].value!r}"
+    )
+    assert "Subcuentas" in wb.sheetnames, f"Expected 'Subcuentas' sheet, got: {wb.sheetnames}"
+    assert "Problemas" in wb.sheetnames, f"Expected 'Problemas' sheet, got: {wb.sheetnames}"
+
+
+def test_render_lenient_end_to_end(tmp_path: pytest.TempPath) -> None:
+    """D-03 end-to-end: lenient read() of corrupt-DIARIO ZIP followed by render() produces valid workbook.
+
+    Build a corrupt-DIARIO ZIP in-memory: Emp01/Diario.dbf is b'NOT A DBF' (corrupt),
+    Emp01/SubCta.dbf is a real synthetic DBF. read(zip_bytes, lenient=True) must produce
+    journal=None, subcta populated. render(data) MUST NOT raise; must produce bytes with
+    Diario/Subcuentas/Problemas sheets.
+
+    RED: render() crashes with AttributeError when data.journal is None.
+    GREEN when: render() has the journal None guard implemented.
+    """
+    import zipfile
+
+    import dbf as _dbf  # dev-only fixture builder
+
+    # Build a real SubCta.dbf using the dbf package (conftest pattern).
+    subcta_path = tmp_path / "SubCta.dbf"
+    subcta_spec = "cod C(12); titulo C(40); nif C(15)"
+    t = _dbf.Table(filename=str(subcta_path), field_specs=subcta_spec, codepage="cp850")
+    t.open(mode=_dbf.READ_WRITE)
+    try:
+        t.append({"cod": "4300000", "titulo": "Cliente XYZ", "nif": ""})
+    finally:
+        t.close()
+
+    # Package into an in-memory ZIP with a corrupt DIARIO.
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as zf:
+        zf.writestr("Emp01/Diario.dbf", b"NOT A DBF")
+        zf.write(subcta_path, arcname="Emp01/SubCta.dbf")
+    zip_bytes = buf.getvalue()
+
+    from contaplus_reader import read
+    from contaplus_reader.xlsx import render
+
+    data = read(zip_bytes, lenient=True)
+    assert data.journal is None, "Expected journal=None for corrupt DIARIO"
+    assert data.subcta is not None, "Expected subcta to be populated"
+
+    # This MUST NOT raise — that was the WR-06 bug.
+    xlsx_bytes = render(data)
+    assert isinstance(xlsx_bytes, bytes)
+    assert len(xlsx_bytes) > 0
+
+    wb = load_workbook(io.BytesIO(xlsx_bytes))
+    assert "Diario" in wb.sheetnames, f"Expected 'Diario' sheet, got: {wb.sheetnames}"
+    assert "Subcuentas" in wb.sheetnames, f"Expected 'Subcuentas' sheet, got: {wb.sheetnames}"
+    assert "Problemas" in wb.sheetnames, f"Expected 'Problemas' sheet, got: {wb.sheetnames}"
