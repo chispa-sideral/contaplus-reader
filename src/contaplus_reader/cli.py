@@ -42,6 +42,13 @@ def main(
             help="Overwrite output file if it already exists",
         ),
     ] = False,
+    lenient: Annotated[
+        bool,
+        typer.Option(
+            "--lenient",
+            help="Extract all readable data; skip unreadable rows/tables into a problems sheet",
+        ),
+    ] = False,
 ) -> None:
     """Convert a ContaPlus DIARIO.DBF or backup .zip to a styled .xlsx workbook."""
     from contaplus_reader import ContaPlusReadError, read
@@ -72,7 +79,7 @@ def main(
 
     # Parse the bytes (bytes-first API).
     try:
-        data = read(raw_bytes, source_name=str(input_file), company=company)
+        data = read(raw_bytes, source_name=str(input_file), company=company, lenient=lenient)
     except ContaPlusReadError as exc:
         # D-17 / D-08: Structured Rich panel -- no Python traceback.
         console.print(
@@ -125,4 +132,6 @@ def main(
         if journal and journal.skipped_memo
         else ""
     )
-    typer.echo(f"{output_file} — {row_count} journal rows, {sheet_count} sheet(s){skip_msg}")
+    problems_count = len(data.problems.entries) if data.problems and data.problems.entries else 0
+    problems_msg = f", {problems_count} problem(s)" if problems_count > 0 else ""
+    typer.echo(f"{output_file} — {row_count} journal rows, {sheet_count} sheet(s){skip_msg}{problems_msg}")
