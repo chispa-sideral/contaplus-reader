@@ -373,3 +373,310 @@ def zip_slip_absolute_zip(tmp_path_factory: pytest.TempPathFactory) -> Path:
     with zipfile.ZipFile(zip_path, "w") as zf:
         zf.writestr("/etc/passwd", b"")
     return zip_path
+
+
+# ---------------------------------------------------------------------------
+# Phase 3 DBF specs (RESEARCH.md §Q1 / §Q2 — VERIFIED from pii-test-data/)
+# All schemas are identical across all 5 real archives.
+# ---------------------------------------------------------------------------
+
+_VENCI_SPEC = (
+    "FECHA D; COD C(12); ACPA C(1); CONTRA C(12); CONCEPTO C(25); "
+    "PTA N(16,2); TIPO C(2); PREPROCESO L; ESTADO L; DOCUMENTO C(10); "
+    "IMPMONEX N(16,2); CODDIVISA C(5); MONEDAUSO C(1); LFACTPLUS L; "
+    "FECHAPAG D; REMESA C(12); NCOBRO N(2,0); NPAGARE N(2,0); "
+    "EURO N(16,2); NUMRECFAC C(12); METALIMP N(16,2)"
+)
+
+_PREDE_SPEC = (
+    "ASIEN N(4,0); TSUBCTA C(1); SUBCTA C(12); NSUBCTA N(3,0); "
+    "TCONTRA C(1); CONTRA C(12); NCONTRA N(3,0); CIMPORTE C(1); "
+    "TIMPORTE C(1); IMPORTE C(50); NIMPORTE N(3,0); TCONCEPTO C(1); "
+    "CONCEPTO C(25); TPROYECTO C(1); PROYECTO C(9); TDOCUM C(1); "
+    "DOCUM C(10); FACTURA L; TBASEIMPO C(1); BASEIMPO C(50); "
+    "NBASEIMPO N(3,0); IVA N(5,2); RECEQUIV N(5,2); "
+    "DSUBCTA N(3,0); DCONTRA N(3,0); DCONCEPTO N(3,0); NCONCEPTO N(3,0); "
+    "LVENCIMIEN L; LMONEX L; TCAMBIO C(1); CAMBIO N(16,6); "
+    "NCAMBIO N(3,0); DCAMBIO N(3,0); LREGULA L; ORIGEN L; "
+    "MOD347 L; TSEGMENTO C(1); SEGMENTO C(12); TOPERACION C(1); "
+    "TIPOOPE C(1); OPBIENES N(1,0)"
+)
+
+_AMOINV_SPEC = (
+    "NUMEROINV C(10); DOCUMENTO C(10); FECHACOMP D; FECPRIAM D; "
+    "CODNAT C(10); IMPORTCOM N(16,2); FACTURA C(15); CONCEPTO C(25); "
+    "UBICACION C(10); GRUPO C(2); SUBCTAAM C(12); SUBCTADO C(12); "
+    "IMPORTAM N(16,2); FECULTAM D; TPCA N(6,2); MESES N(2,0); "
+    "PROVEEDOR C(12); FECHAFIN D; FECHABAJA D; CODBAJ C(2); "
+    "MONEDAUSO C(1); IMPAMEURO N(16,2); IMPCOEURO N(16,2); "
+    "TIPOOPE C(1); BASEIMPO N(16,2); TIPOIMPO N(16,2); CUOTAIMP N(16,2); "
+    "IMPTOFACT N(16,2); PRORRATA N(7,2); ANOREGULA N(2,0); "
+    "FACTTRAN C(15); CUOTABINV N(16,2); ANOFINREG N(2,0); "
+    "LIBRO L; TRANSPRO N(1,0)"
+)
+
+_NIVEL_SPEC = (
+    "N1 L; N2 L; N3 L; N4 L; N5 L; N6 L; "
+    "N7 L; N8 L; N9 L; N10 L; N11 L; N12 L; LASTCASADO N(6,0)"
+)
+
+_BALAN_SPEC = (
+    "NATURALEZA C(2); CODBAL C(10); DESCRIP C(100); CTA C(11); "
+    "TIPO N(1,0); BITMAP C(10); DOBLE C(1); FORMULA C(255); "
+    "NIVEL N(2,0); DESGLOSE N(2,0); ACPA C(1); NUMERO C(6); "
+    "CTAPGC C(12); SDO_CIERRE N(19,2); NIV_CIERRE N(2,0); "
+    "LINTERRUMP L; NOTMEMORIA C(50)"
+)
+
+
+# ---------------------------------------------------------------------------
+# Phase 3 fixtures — operational tables (TABL-03 / BAL-01)
+# ---------------------------------------------------------------------------
+
+@pytest.fixture(scope="session")
+def venci_dbf(tmp_path_factory: pytest.TempPathFactory) -> Path:
+    """venci.dbf synthetic fixture — 21 fields, 0 rows (matches real data)."""
+    target_dir = tmp_path_factory.mktemp("venci_dbf")
+    target = target_dir / "venci.dbf"
+    return _build_generic_dbf(target, _VENCI_SPEC, [])
+
+
+@pytest.fixture(scope="session")
+def prede_dbf(tmp_path_factory: pytest.TempPathFactory) -> Path:
+    """prede.dbf synthetic fixture — 41 fields, 0 rows (matches real data)."""
+    target_dir = tmp_path_factory.mktemp("prede_dbf")
+    target = target_dir / "prede.dbf"
+    return _build_generic_dbf(target, _PREDE_SPEC, [])
+
+
+@pytest.fixture(scope="session")
+def amoinv_dbf(tmp_path_factory: pytest.TempPathFactory) -> Path:
+    """amoinv.dbf synthetic fixture — 35 fields, 0 rows (matches real data)."""
+    target_dir = tmp_path_factory.mktemp("amoinv_dbf")
+    target = target_dir / "amoinv.dbf"
+    return _build_generic_dbf(target, _AMOINV_SPEC, [])
+
+
+@pytest.fixture(scope="session")
+def nivel_dbf(tmp_path_factory: pytest.TempPathFactory) -> Path:
+    """nivel.dbf synthetic fixture — 13 fields, exactly 1 row (RESEARCH.md Pitfall 6).
+
+    nivel is a configuration singleton: N1..N12 are level-active booleans,
+    LASTCASADO is the last-reconciled entry counter.
+    """
+    target_dir = tmp_path_factory.mktemp("nivel_dbf")
+    target = target_dir / "nivel.dbf"
+    return _build_generic_dbf(target, _NIVEL_SPEC, [
+        {
+            "n1": True, "n2": True, "n3": False, "n4": False,
+            "n5": False, "n6": False, "n7": False, "n8": False,
+            "n9": False, "n10": False, "n11": False, "n12": False,
+            "lastcasado": 0,
+        },
+    ])
+
+
+@pytest.fixture(scope="session")
+def balan_balanced_dbf(tmp_path_factory: pytest.TempPathFactory) -> Path:
+    """BALAN.DBF synthetic fixture — 3 rows with SDO_CIERRE summing to 0.00.
+
+    sum(SDO_CIERRE) = 100.00 + (-60.00) + (-40.00) = 0.00 — no descuadre.
+    """
+    target_dir = tmp_path_factory.mktemp("balan_balanced")
+    target = target_dir / "BALAN.DBF"
+    rows = [
+        {
+            "naturaleza": "A", "codbal": "10000", "descrip": "Caja",
+            "cta": "10000000000", "tipo": 2, "bitmap": "", "doble": "",
+            "formula": "", "nivel": 1, "desglose": 0, "acpa": "A",
+            "numero": "001000", "ctapgc": "", "sdo_cierre": 100.00,
+            "niv_cierre": 0, "linterrump": False, "notmemoria": "",
+        },
+        {
+            "naturaleza": "P", "codbal": "40000", "descrip": "Proveedores",
+            "cta": "40000000000", "tipo": 2, "bitmap": "", "doble": "",
+            "formula": "", "nivel": 1, "desglose": 0, "acpa": "P",
+            "numero": "002000", "ctapgc": "", "sdo_cierre": -60.00,
+            "niv_cierre": 0, "linterrump": False, "notmemoria": "",
+        },
+        {
+            "naturaleza": "P", "codbal": "41000", "descrip": "Otros acreedores",
+            "cta": "41000000000", "tipo": 2, "bitmap": "", "doble": "",
+            "formula": "", "nivel": 1, "desglose": 0, "acpa": "P",
+            "numero": "003000", "ctapgc": "", "sdo_cierre": -40.00,
+            "niv_cierre": 0, "linterrump": False, "notmemoria": "",
+        },
+    ]
+    return _build_generic_dbf(target, _BALAN_SPEC, rows)
+
+
+@pytest.fixture(scope="session")
+def balan_unbalanced_dbf(tmp_path_factory: pytest.TempPathFactory) -> Path:
+    """BALAN.DBF synthetic fixture — 3 rows with SDO_CIERRE summing to 10.00.
+
+    sum(SDO_CIERRE) = 100.00 + (-60.00) + (-30.00) = 10.00 — descuadre!
+    """
+    target_dir = tmp_path_factory.mktemp("balan_unbalanced")
+    target = target_dir / "BALAN.DBF"
+    rows = [
+        {
+            "naturaleza": "A", "codbal": "10000", "descrip": "Caja",
+            "cta": "10000000000", "tipo": 2, "bitmap": "", "doble": "",
+            "formula": "", "nivel": 1, "desglose": 0, "acpa": "A",
+            "numero": "001000", "ctapgc": "", "sdo_cierre": 100.00,
+            "niv_cierre": 0, "linterrump": False, "notmemoria": "",
+        },
+        {
+            "naturaleza": "P", "codbal": "40000", "descrip": "Proveedores",
+            "cta": "40000000000", "tipo": 2, "bitmap": "", "doble": "",
+            "formula": "", "nivel": 1, "desglose": 0, "acpa": "P",
+            "numero": "002000", "ctapgc": "", "sdo_cierre": -60.00,
+            "niv_cierre": 0, "linterrump": False, "notmemoria": "",
+        },
+        {
+            "naturaleza": "P", "codbal": "41000", "descrip": "Otros acreedores",
+            "cta": "41000000000", "tipo": 2, "bitmap": "", "doble": "",
+            "formula": "", "nivel": 1, "desglose": 0, "acpa": "P",
+            "numero": "003000", "ctapgc": "", "sdo_cierre": -30.00,
+            "niv_cierre": 0, "linterrump": False, "notmemoria": "",
+        },
+    ]
+    return _build_generic_dbf(target, _BALAN_SPEC, rows)
+
+
+# ---------------------------------------------------------------------------
+# Phase 3 fixtures — defect-bearing DBFs for lenient path tests (API-03)
+# ---------------------------------------------------------------------------
+
+@pytest.fixture(scope="session")
+def diario_with_bad_row(tmp_path_factory: pytest.TempPathFactory) -> Path:
+    """DIARIO.DBF with 3 rows: row 0 valid, row 1 bad subcta="BADCODE", row 2 valid.
+
+    Row 1 has subcta="BADCODE" which triggers D-E3 (malformed subcuenta):
+    not purely numeric, so strict mode raises ContaPlusReadError(row_index=1).
+    Lenient mode skips row 1, returns 2 good rows, and records one ProblemEntry.
+    """
+    target_dir = tmp_path_factory.mktemp("diario_bad_row")
+    target = target_dir / "DIARIO.DBF"
+    rows = [
+        {
+            "asien": 1,
+            "fecha": _dt.date(2025, 1, 1),
+            "subcta": "4300000",
+            "contra": "",
+            "concepto": "Good row one",
+            "eurodebe": 100.0,
+            "eurohaber": 0.0,
+        },
+        {
+            "asien": 2,
+            "fecha": _dt.date(2025, 1, 2),
+            "subcta": "BADCODE",  # triggers D-E3 malformed subcuenta
+            "contra": "",
+            "concepto": "Bad subcta",
+            "eurodebe": 50.0,
+            "eurohaber": 0.0,
+        },
+        {
+            "asien": 3,
+            "fecha": _dt.date(2025, 1, 3),
+            "subcta": "7000000",
+            "contra": "",
+            "concepto": "Good row three",
+            "eurodebe": 0.0,
+            "eurohaber": 100.0,
+        },
+    ]
+    return _build_diario_dbf(target, rows, codepage="cp850")
+
+
+@pytest.fixture(scope="session")
+def zip_with_all_tables(
+    cp850_basic_dbf: Path,
+    tmp_path_factory: pytest.TempPathFactory,
+) -> Path:
+    """ZIP with all 10 catalogued tables under Emp01/ prefix (TABL-04 integration fixture).
+
+    Contains: DIARIO.DBF, SUBCTA.DBF, BALAN.DBF, grupos.dbf, usuarios.dbf,
+    empresa.dbf, venci.dbf, prede.dbf, amoinv.dbf, nivel.dbf.
+    """
+    zip_dir = tmp_path_factory.mktemp("zip_all_tables")
+    zip_path = zip_dir / "backup_full.zip"
+
+    # Build each sibling
+    subcta_path = zip_dir / "SubCta.dbf"
+    _build_subcta_dbf(subcta_path, [
+        {"cod": "4300000", "titulo": "Cliente XYZ", "nif": ""},
+    ])
+    balan_path = zip_dir / "BALAN.DBF"
+    _build_generic_dbf(balan_path, _BALAN_SPEC, [
+        {
+            "naturaleza": "A", "codbal": "10000", "descrip": "Caja",
+            "cta": "10000000000", "tipo": 2, "bitmap": "", "doble": "",
+            "formula": "", "nivel": 1, "desglose": 0, "acpa": "A",
+            "numero": "001000", "ctapgc": "", "sdo_cierre": 0.00,
+            "niv_cierre": 0, "linterrump": False, "notmemoria": "",
+        },
+    ])
+    grupos_path = zip_dir / "grupos.dbf"
+    _build_generic_dbf(grupos_path, _GRUPOS_SPEC, [
+        {"cod": "GRP01", "descrip": "Grupo principal"},
+    ])
+    usuarios_path = zip_dir / "usuarios.dbf"
+    _build_generic_dbf(usuarios_path, _USUARIOS_SPEC, [
+        {"codigo": "USR01", "nombre": "Admin", "clave": "secret"},
+    ])
+    empresa_path = zip_dir / "empresa.dbf"
+    _build_generic_dbf(empresa_path, _EMPRESA_SPEC, [
+        {"codigo": "EMP01", "nombre": "Mi Empresa SL", "nif": "B12345678"},
+    ])
+    venci_path = zip_dir / "venci.dbf"
+    _build_generic_dbf(venci_path, _VENCI_SPEC, [])
+    prede_path = zip_dir / "prede.dbf"
+    _build_generic_dbf(prede_path, _PREDE_SPEC, [])
+    amoinv_path = zip_dir / "amoinv.dbf"
+    _build_generic_dbf(amoinv_path, _AMOINV_SPEC, [])
+    nivel_path = zip_dir / "nivel.dbf"
+    _build_generic_dbf(nivel_path, _NIVEL_SPEC, [
+        {
+            "n1": True, "n2": True, "n3": False, "n4": False,
+            "n5": False, "n6": False, "n7": False, "n8": False,
+            "n9": False, "n10": False, "n11": False, "n12": False,
+            "lastcasado": 0,
+        },
+    ])
+
+    with zipfile.ZipFile(zip_path, "w") as zf:
+        zf.write(cp850_basic_dbf, arcname="Emp01/Diario.dbf")
+        zf.write(subcta_path, arcname="Emp01/SubCta.dbf")
+        zf.write(balan_path, arcname="Emp01/BALAN.DBF")
+        zf.write(grupos_path, arcname="Emp01/grupos.dbf")
+        zf.write(usuarios_path, arcname="Emp01/usuarios.dbf")
+        zf.write(empresa_path, arcname="Emp01/empresa.dbf")
+        zf.write(venci_path, arcname="Emp01/venci.dbf")
+        zf.write(prede_path, arcname="Emp01/prede.dbf")
+        zf.write(amoinv_path, arcname="Emp01/amoinv.dbf")
+        zf.write(nivel_path, arcname="Emp01/nivel.dbf")
+    return zip_path
+
+
+@pytest.fixture(scope="session")
+def zip_with_uncatalogued(
+    cp850_basic_dbf: Path,
+    tmp_path_factory: pytest.TempPathFactory,
+) -> Path:
+    """ZIP with DIARIO.DBF plus an unrecognized extra.dbf (D-13 lenient test).
+
+    extra.dbf has a minimal 1-field spec and 0 rows. Its name is not in the
+    10-table catalogue, so lenient mode must produce one informational ProblemEntry.
+    """
+    zip_dir = tmp_path_factory.mktemp("zip_uncatalogued")
+    zip_path = zip_dir / "backup_extra.zip"
+
+    extra_path = zip_dir / "extra.dbf"
+    _build_generic_dbf(extra_path, "CAMPO C(10)", [])
+
+    with zipfile.ZipFile(zip_path, "w") as zf:
+        zf.write(cp850_basic_dbf, arcname="Emp01/Diario.dbf")
+        zf.write(extra_path, arcname="Emp01/extra.dbf")
+    return zip_path
