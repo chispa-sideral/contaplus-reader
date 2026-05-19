@@ -4,15 +4,29 @@ version = "0.1.0"
 description = "Read Sage ContaPlus accounting exports (DIARIO.DBF, .zip) into usable formats"
 readme = "README.md"
 requires-python = ">=3.13"
-license = { text = "LGPL-3.0-or-later" }
+license = "LGPL-3.0-or-later"
+license-files = ["LICENSE"]
 authors = [{ name = "Marc Fargas" }]
-
+keywords = ["contaplus", "sage", "dbf", "accounting", "xlsx", "contabilidad"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Financial and Insurance Industry",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Office/Business :: Financial :: Accounting",
+    "Topic :: Utilities",
+]
 dependencies = [
     "dbfread>=2.0.7",
     "pandas>=2.2",
     "openpyxl>=3.1.5",
-    "typer[all]>=0.13",
+    "typer>=0.13",
 ]
+
+[project.urls]
+Repository = "https://github.com/marcfargas/contaplus-reader"
+Issues = "https://github.com/marcfargas/contaplus-reader/issues"
 
 [project.scripts]
 contaplus2xlsx = "contaplus_reader.cli:app"
@@ -26,9 +40,30 @@ dev = [
     "dbf>=0.99.11",
     "pytest>=8.4",
 ]
+# python-semantic-release is intentionally NOT a project dependency: it pins
+# click~=8.1, which would force the whole environment off click 8.3 and break
+# the CLI test suite (which uses the click 8.2+ result.stderr API). PSR is a
+# release-time tool — CI and local release runs invoke it isolated via
+# `uvx python-semantic-release` (see .github/workflows/release.yml). The
+# [tool.semantic_release] config below is still read by PSR when run that way.
 
 [tool.uv]
 package = true
+
+[[tool.uv.index]]
+name = "testpypi"
+url = "https://test.pypi.org/simple/"
+publish-url = "https://test.pypi.org/legacy/"
+explicit = true
+
+[tool.semantic_release]
+version_toml = ["pyproject.toml:project.version"]
+branch = "main"
+changelog_file = "CHANGELOG.md"
+
+[tool.semantic_release.commit_parser_options]
+minor_tags = ["feat"]
+patch_tags = ["fix", "perf", "refactor"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
