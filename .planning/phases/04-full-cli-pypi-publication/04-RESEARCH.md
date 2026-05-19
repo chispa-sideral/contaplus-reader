@@ -798,7 +798,11 @@ addopts = ["-q"]
 
 ---
 
-## Open Questions
+## Open Questions (RESOLVED)
+
+> Both items are residual runtime unknowns with explicit mitigations wired into
+> Phase 4 task actions (04-04 Task 3 mandates the PSR `--print` dry-run; the
+> ci/smoke.mjs run surfaces micropip+dbfread resolution). Neither blocks planning.
 
 1. **PSR first-release version pinning**
    - What we know: PSR scans commit history from the last tag. There are no prior tags.
