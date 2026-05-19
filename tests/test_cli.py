@@ -15,6 +15,7 @@ Tests cover:
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 import pytest
@@ -23,6 +24,18 @@ from typer.testing import CliRunner
 from contaplus_reader.cli import app
 
 runner = CliRunner()
+
+# Matches ANSI CSI escape sequences (color/style codes). Rich emits these when
+# color output is enabled (e.g. in CI, where FORCE_COLOR is set). With color on,
+# Rich's --help highlighter styles the leading dash of an option separately from
+# the rest of the name, so the literal substring "--force" is interrupted by an
+# escape sequence. Stripping ANSI codes restores the plain text for assertions.
+_ANSI_RE = re.compile(r"\x1b\[[0-9;]*m")
+
+
+def _strip_ansi(text: str) -> str:
+    """Return *text* with ANSI CSI escape sequences removed."""
+    return _ANSI_RE.sub("", text)
 
 
 # ---------------------------------------------------------------------------
@@ -203,8 +216,11 @@ def test_cli_help_shows_force_option() -> None:
     """--help must mention --force/--overwrite in the options section."""
     result = runner.invoke(app, ["--help"])
     assert result.exit_code == 0
-    assert "--force" in result.output
-    assert "--overwrite" in result.output
+    # Strip ANSI codes: with color enabled (CI), Rich styles the leading dash of
+    # an option separately, splitting the literal "--force" substring.
+    plain = _strip_ansi(result.output)
+    assert "--force" in plain
+    assert "--overwrite" in plain
 
 
 # ===========================================================================
