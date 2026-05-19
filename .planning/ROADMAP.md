@@ -19,7 +19,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 1: Journal Slice** - Thin working vertical: bytes → DIARIO.DBF reader → XLSX → CLI (completed 2026-05-15)
 - [x] **Phase 2: ZIP & Subaccounts** - ZIP input, SUBCTA reader, journal name enrichment, group-level tables (completed 2026-05-16)
 - [x] **Phase 3: Full Tables, Balance & Lenient Path** - Operational-table readers, trial-balance computation, lenient conversion path, XLSX report sheet (completed 2026-05-17)
-- [ ] **Phase 4: Full CLI & PyPI Publication** - Multi-company flag, stdout reporting, wheel published to PyPI
+- [x] **Phase 4: Full CLI & PyPI Publication** - Multi-company flag, stdout reporting, wheel published to PyPI (completed 2026-05-19)
 - [ ] **Phase 5: Browser PWA** - Pyodide spike then full client-side PWA on Cloudflare Pages
 
 ## Phase Details
@@ -115,7 +115,7 @@ Plans:
 - [x] 04-03-PLAN.md — CI infrastructure: .github/workflows/release.yml (trusted publishing), ci/smoke.mjs + ci/package.json (micropip smoke test)
 
 **Wave 3** *(blocked on Wave 2 completion — human-gated)*
-- [ ] 04-04-PLAN.md — Publication: GitHub push, trusted publisher setup (human), PSR release, TestPyPI verification (human), pypi deploy approval (human), micropip smoke gate
+- [x] 04-04-PLAN.md — Publication: GitHub push, trusted publisher setup (human), PSR release, TestPyPI verification (human), pypi deploy approval (human), micropip smoke gate
 
 ### Phase 5: Browser PWA
 **Goal**: Any user can drag-and-drop a ContaPlus file on a public URL, convert it entirely in the browser, and download the styled `.xlsx` — the file never leaves their machine
@@ -140,5 +140,5 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 | 1. Journal Slice | 4/4 | Complete   | 2026-05-15 |
 | 2. ZIP & Subaccounts | 3/3 | Complete   | 2026-05-16 |
 | 3. Full Tables, Balance & Lenient Path | 5/5 | Complete    | 2026-05-17 |
-| 4. Full CLI & PyPI Publication | 3/4 | In Progress|  |
+| 4. Full CLI & PyPI Publication | 4/4 | Complete   | 2026-05-19 |
 | 5. Browser PWA | 0/TBD | Not started | - |
