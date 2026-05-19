@@ -1,0 +1,9 @@
+{
+  "name": "contaplus-micropip-smoke",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "pyodide": "0.29.4"
+  }
+}
