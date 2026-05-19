@@ -256,3 +256,48 @@ def test_cli_multi_company_no_flag_exits_1(
     assert "Emp01" in combined, (
         f"Expected 'Emp01' in error output for multi-company ZIP, got: {combined!r}"
     )
+
+
+# ---------------------------------------------------------------------------
+# Report output (CLI-03 D-01/D-02/D-03)
+# ---------------------------------------------------------------------------
+
+def test_report_shows_diario_row_count(tmp_path: Path, cp850_basic_dbf: Path) -> None:
+    """D-02: Report must include 'Diario:' line with correct row count."""
+    out = tmp_path / "out.xlsx"
+    result = runner.invoke(app, [str(cp850_basic_dbf), str(out)])
+    assert result.exit_code == 0
+    assert "Diario:" in result.output
+    assert "3" in result.output  # cp850_basic_dbf has 3 rows
+
+
+def test_report_shows_skipped_memo_count(
+    tmp_path: Path, diario_with_memo_dbf: Path
+) -> None:
+    """D-02: Report must include 'Memo lines skipped:' when skipped_memo > 0."""
+    out = tmp_path / "out.xlsx"
+    result = runner.invoke(app, [str(diario_with_memo_dbf), str(out)])
+    assert result.exit_code == 0
+    assert "Memo lines skipped:" in result.output
+
+
+def test_report_shows_problem_entries_in_lenient(
+    tmp_path: Path, diario_with_bad_row: Path
+) -> None:
+    """D-03: Lenient mode report must list each problem entry inline on stdout."""
+    out = tmp_path / "out.xlsx"
+    result = runner.invoke(app, [str(diario_with_bad_row), str(out), "--lenient"])
+    assert result.exit_code == 0
+    assert "Problems" in result.output
+    # Problem entry must include the table name
+    assert "DIARIO" in result.output
+
+
+def test_report_no_problems_section_in_strict(
+    tmp_path: Path, cp850_basic_dbf: Path
+) -> None:
+    """D-03: Strict mode (default) must not print a 'Problems' section."""
+    out = tmp_path / "out.xlsx"
+    result = runner.invoke(app, [str(cp850_basic_dbf), str(out)])
+    assert result.exit_code == 0
+    assert "Problems" not in result.output

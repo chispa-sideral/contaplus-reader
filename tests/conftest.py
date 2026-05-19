@@ -660,6 +660,54 @@ def zip_with_all_tables(
     return zip_path
 
 
+# ---------------------------------------------------------------------------
+# Phase 4 fixtures — CLI-03 memo fixture (plan 04-01)
+# ---------------------------------------------------------------------------
+
+@pytest.fixture(scope="session")
+def diario_with_memo_dbf(
+    tmp_path_factory: pytest.TempPathFactory,
+) -> Path:
+    """DIARIO.DBF with 2 valid rows + 1 both-zero memo row.
+
+    The both-zero row (eurodebe=0.0, eurohaber=0.0) is treated by the reader
+    as a memo line and skipped, setting skipped_memo=1 on the journal.
+    Used by CLI-03 tests to verify 'Memo lines skipped:' appears in the report.
+    """
+    target_dir = tmp_path_factory.mktemp("diario_with_memo")
+    target = target_dir / "DIARIO.DBF"
+    rows = [
+        {
+            "asien": 1,
+            "fecha": _dt.date(2025, 1, 1),
+            "subcta": "4300000",
+            "contra": "",
+            "concepto": "Valid row one",
+            "eurodebe": 100.0,
+            "eurohaber": 0.0,
+        },
+        {
+            "asien": 1,
+            "fecha": _dt.date(2025, 1, 1),
+            "subcta": "7000000",
+            "contra": "",
+            "concepto": "Valid row two",
+            "eurodebe": 0.0,
+            "eurohaber": 100.0,
+        },
+        {
+            "asien": 2,
+            "fecha": _dt.date(2025, 1, 2),
+            "subcta": "1000000",
+            "contra": "",
+            "concepto": "Memo line zero",
+            "eurodebe": 0.0,
+            "eurohaber": 0.0,
+        },
+    ]
+    return _build_diario_dbf(target, rows, codepage="cp850")
+
+
 @pytest.fixture(scope="session")
 def zip_with_uncatalogued(
     cp850_basic_dbf: Path,
