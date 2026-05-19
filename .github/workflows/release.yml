@@ -3,6 +3,7 @@ name: Release
 on:
   release:
     types: [created]
+  workflow_dispatch:
 
 jobs:
   build:
@@ -36,6 +37,7 @@ jobs:
 
   pypi:
     needs: testpypi
+    if: github.event_name == 'release'
     runs-on: ubuntu-latest
     environment:
       name: pypi
@@ -53,6 +55,7 @@ jobs:
 
   micropip-smoke:
     needs: pypi
+    if: github.event_name == 'release'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
