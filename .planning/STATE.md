@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-last_updated: "2026-05-19T06:46:49.077Z"
-last_activity: 2026-05-19 -- Phase 04 planning complete
+last_updated: "2026-05-19T06:55:38.722Z"
+last_activity: 2026-05-19
 progress:
   total_phases: 5
   completed_phases: 3
   total_plans: 16
-  completed_plans: 12
+  completed_plans: 13
   percent: 60
 ---
 
@@ -20,16 +20,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-05-15)
 
 **Core value:** Read ContaPlus exports correctly — above all the journal, whose strict validated reading tax-workbench depends on for tax filings.
-**Current focus:** Phase 4 — full cli & pypi publication
+**Current focus:** Phase 04 — full-cli-pypi-publication
 
 ## Current Position
 
-Phase: 4
-Plan: Not started
+Phase: 04 (full-cli-pypi-publication) — EXECUTING
+Plan: 2 of 4
 Status: Ready to execute
-Last activity: 2026-05-19 -- Phase 04 planning complete
+Last activity: 2026-05-19
 
-Progress: [██████████] 100%
+Progress: [████████░░] 81%
 
 ## Performance Metrics
 
@@ -58,6 +58,7 @@ Progress: [██████████] 100%
 | Phase 02-zip-subaccounts P01 | 10 | 2 tasks | 4 files |
 | Phase 02-zip-subaccounts P02 | 25 | 2 tasks | 7 files |
 | Phase 02-zip-subaccounts P03 | 15 | 2 tasks | 4 files |
+| Phase 04-full-cli-pypi-publication P01 | 3 | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -82,6 +83,7 @@ Recent decisions affecting current work:
 - [Phase ?]: D-12 implemented: data-driven renderer emits one sheet per non-None ContaPlusData table
 - [Phase ?]: D-15 implemented: Descripción column at index 4 in Diario sheet
 - [Phase ?]: D-07 implemented: --company flag added to CLI, passed to read()
+- [04-01]: D-01/D-02/D-03 implemented: _print_report() replaces D-16 one-liner; WR-07 openpyxl re-parse block removed; CLI-03 satisfied
 
 ### Pending Todos
 
@@ -99,6 +101,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-05-18T19:53:25.753Z
-Stopped at: Phase 4 context gathered
-Resume file: .planning/phases/04-full-cli-pypi-publication/04-CONTEXT.md
+Last session: 2026-05-19T06:54:21Z
+Stopped at: Completed 04-01-PLAN.md (CLI-03 _print_report + WR-07 removal)
+Resume file: .planning/phases/04-full-cli-pypi-publication/04-02-PLAN.md

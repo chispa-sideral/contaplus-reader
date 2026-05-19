@@ -108,7 +108,7 @@ Plans:
 
 Plans:
 **Wave 1** *(parallel — no shared files)*
-- [ ] 04-01-PLAN.md — CLI-03 report: diario_with_memo_dbf fixture, 4 new CLI-03 tests (RED), _print_report() implementation (GREEN), WR-07 block removed
+- [x] 04-01-PLAN.md — CLI-03 report: diario_with_memo_dbf fixture, 4 new CLI-03 tests (RED), _print_report() implementation (GREEN), WR-07 block removed
 - [ ] 04-02-PLAN.md — Package metadata: pyproject.toml PEP 639 + classifiers + PSR config + typer fix, LICENSE, README expansion, .gitignore verification
 
 **Wave 2** *(blocked on Wave 1 completion — specifically 04-02)*
@@ -140,5 +140,5 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 | 1. Journal Slice | 4/4 | Complete   | 2026-05-15 |
 | 2. ZIP & Subaccounts | 3/3 | Complete   | 2026-05-16 |
 | 3. Full Tables, Balance & Lenient Path | 5/5 | Complete    | 2026-05-17 |
-| 4. Full CLI & PyPI Publication | 0/4 | Not started | - |
+| 4. Full CLI & PyPI Publication | 1/4 | In Progress|  |
 | 5. Browser PWA | 0/TBD | Not started | - |
