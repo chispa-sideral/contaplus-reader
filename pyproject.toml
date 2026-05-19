@@ -25,8 +25,8 @@ dependencies = [
 ]
 
 [project.urls]
-Repository = "https://github.com/marcfargas/contaplus-reader"
-Issues = "https://github.com/marcfargas/contaplus-reader/issues"
+Repository = "https://github.com/chispa-sideral/contaplus-reader"
+Issues = "https://github.com/chispa-sideral/contaplus-reader/issues"
 
 [project.scripts]
 contaplus2xlsx = "contaplus_reader.cli:app"
