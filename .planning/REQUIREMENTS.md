@@ -66,7 +66,7 @@ Requirements for the initial release. Each maps to roadmap phases.
 
 ### Distribution
 
-- [ ] **DIST-01**: Library is published to PyPI as `contaplus-reader` under LGPL-3.0-or-later
+- [x] **DIST-01**: Library is published to PyPI as `contaplus-reader` under LGPL-3.0-or-later
 - [x] **DIST-02**: `uv build` produces a wheel usable for PyPI publish and for local dev (editable installs, `micropip` from a locally built wheel)
 
 ### Testing
@@ -138,7 +138,7 @@ Which phases cover which requirements.
 | PWA-03 | Phase 5 | Pending |
 | PWA-04 | Phase 5 | Pending |
 | PWA-05 | Phase 5 | Pending |
-| DIST-01 | Phase 4 | Pending |
+| DIST-01 | Phase 4 | Complete |
 | DIST-02 | Phase 1 | Complete |
 | TEST-01 | Phase 1 | Pending |
 | TEST-02 | Phase 1 | Pending |
