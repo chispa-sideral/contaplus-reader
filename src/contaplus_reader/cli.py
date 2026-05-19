@@ -23,6 +23,51 @@ from rich.panel import Panel
 app = typer.Typer(add_completion=False)
 
 
+def _print_report(data: ContaPlusData, output_file: Path) -> None:
+    """Print the conversion report to stdout (D-01/D-02/D-03)."""
+    typer.echo(f"Converted: {output_file}")
+    typer.echo("")
+
+    # Per-table row counts (D-02) -- order matches render() in xlsx.py
+    if data.journal:
+        typer.echo(f"  Diario:                {len(data.journal.rows):>8} rows")
+        if data.journal.skipped_memo:
+            typer.echo(f"  Memo lines skipped:    {data.journal.skipped_memo:>8}")
+    if data.subcta:
+        typer.echo(f"  Subcuentas:            {len(data.subcta.rows):>8} rows")
+    if data.balan:
+        typer.echo(f"  Balance (raw):         {len(data.balan.rows):>8} rows")
+    if data.balance_cuenta:
+        typer.echo(f"  Sumas y Saldos (ctas): {len(data.balance_cuenta.rows):>8} rows")
+    if data.balance_subcuenta:
+        typer.echo(f"  Sumas y Saldos (subs): {len(data.balance_subcuenta.rows):>8} rows")
+    for attr, label in [
+        ("venci",    "Vencimientos"),
+        ("prede",    "Predefinidos"),
+        ("amoinv",   "Amortizaciones"),
+        ("nivel",    "Niveles"),
+        ("empresa",  "Empresa"),
+        ("grupos",   "Grupos"),
+        ("usuarios", "Usuarios"),
+    ]:
+        table = getattr(data, attr, None)
+        if table is not None:
+            typer.echo(f"  {label + ':':<22} {len(table.rows):>8} rows")
+
+    # Problem entries inline (D-03 -- lenient mode only)
+    if data.problems and data.problems.entries:
+        typer.echo("")
+        typer.echo(f"  Problems ({len(data.problems.entries)}):")
+        for entry in data.problems.entries:
+            row_ref = f"row {entry.row_index}" if entry.row_index >= 0 else "file level"
+            typer.echo(
+                f"    [{entry.table}] {row_ref}"
+                + (f", col {entry.column}" if entry.column else "")
+                + f": {entry.reason}"
+                + (f" (value: {entry.value!r})" if entry.value else "")
+            )
+
+
 @app.command()
 def main(
     input_file: Annotated[Path, typer.Argument(help="Path to DIARIO.DBF file or backup .zip")],
@@ -51,7 +96,7 @@ def main(
     ] = False,
 ) -> None:
     """Convert a ContaPlus DIARIO.DBF or backup .zip to a styled .xlsx workbook."""
-    from contaplus_reader import ContaPlusReadError, read
+    from contaplus_reader import ContaPlusData, ContaPlusReadError, read
     from contaplus_reader.xlsx import render
 
     # Console writes to stderr so it doesn't pollute stdout (D-17).
@@ -120,20 +165,4 @@ def main(
         )
         raise typer.Exit(1) from None
 
-    # D-16: Concise success summary with row count, sheet count, and optional skip count.
-    # WR-07: derive sheet_count from the rendered workbook so it always matches the
-    # actual number of sheets produced by render(), regardless of which tables are
-    # present (Phase 3 adds balan, venci, prede, amoinv, nivel, balance sheets, etc.).
-    import io as _io
-    from openpyxl import load_workbook as _load_wb
-    sheet_count = len(_load_wb(_io.BytesIO(xlsx_bytes), read_only=True, data_only=True).sheetnames)
-    journal = data.journal
-    row_count = len(journal.rows) if journal else 0
-    skip_msg = (
-        f" ({journal.skipped_memo} memo lines skipped)"
-        if journal and journal.skipped_memo
-        else ""
-    )
-    problems_count = len(data.problems.entries) if data.problems and data.problems.entries else 0
-    problems_msg = f", {problems_count} problem(s)" if problems_count > 0 else ""
-    typer.echo(f"{output_file} — {row_count} journal rows, {sheet_count} sheet(s){skip_msg}{problems_msg}")
+    _print_report(data, output_file)

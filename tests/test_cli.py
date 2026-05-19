@@ -53,12 +53,13 @@ def test_cli_happy_path_output_is_valid_xlsx(tmp_path: Path, cp850_basic_dbf: Pa
 # ---------------------------------------------------------------------------
 
 def test_cli_success_output_format(tmp_path: Path, cp850_basic_dbf: Path) -> None:
-    """Success output must match 'out.xlsx -- N journal rows'."""
+    """Success output must start with 'Converted:' and include per-table counts (D-01/D-02)."""
     out = tmp_path / "result.xlsx"
     result = runner.invoke(app, [str(cp850_basic_dbf), str(out)])
     assert result.exit_code == 0
-    # D-16: must include file name, em dash, row count
-    assert "journal rows" in result.output
+    # D-01/D-02: report block starts with 'Converted:' and includes 'Diario:' row count line
+    assert "Converted:" in result.output
+    assert "Diario:" in result.output
 
 
 def test_cli_success_output_contains_filename(tmp_path: Path, cp850_basic_dbf: Path) -> None:
