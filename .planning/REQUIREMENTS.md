@@ -53,7 +53,7 @@ Requirements for the initial release. Each maps to roadmap phases.
 
 - [x] **CLI-01**: `contaplus2xlsx` converts a single `.dbf`/`.zip` file to a styled `.xlsx`
 - [x] **CLI-02**: CLI selects a company in a multi-company backup via a flag
-- [ ] **CLI-03**: CLI reports row counts, skipped-memo count, and any problems to stdout
+- [x] **CLI-03**: CLI reports row counts, skipped-memo count, and any problems to stdout
 - [x] **CLI-04**: CLI is installable and runnable via `uvx` / `pipx`
 
 ### PWA
@@ -131,7 +131,7 @@ Which phases cover which requirements.
 | XLSX-04 | Phase 1 | Complete |
 | CLI-01 | Phase 1 | Complete |
 | CLI-02 | Phase 4 | Complete |
-| CLI-03 | Phase 4 | Pending |
+| CLI-03 | Phase 4 | Complete |
 | CLI-04 | Phase 1 | Complete |
 | PWA-01 | Phase 5 | Pending |
 | PWA-02 | Phase 5 | Pending |

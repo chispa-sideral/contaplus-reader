@@ -31,6 +31,8 @@ else (CLI, PWA, styling) is delivery; correct extraction cannot fail.
 - [x] Strict typed API path — fails loudly on invalid data (preserves tax-workbench's contract) — *journal path Phase 1; all other tables Validated in Phase 3*
 - [x] Lenient conversion path — extracts what it can, collects problems into a report, never aborts the whole file — *Validated in Phase 3: Full Tables, Balance & Lenient Path*
 - [x] Self-contained result model (`ContaPlusJournal` and sibling per-table types) — no `tw-domain` types — *`ContaPlusJournal` Phase 1; sibling types Validated in Phase 3*
+- [x] `contaplus2xlsx` converts a single `.dbf`/`.zip` to one `.xlsx`; multi-company `.zip` selected via `--company`; multi-line stdout report (per-table row counts, skipped-memo count, problem entries) after every conversion — *Validated in Phase 4: Full CLI & PyPI Publication*
+- [x] Published to PyPI as `contaplus-reader` (LGPL-3.0-or-later, OIDC trusted publishing); `uv build` wheel proven `micropip`-installable in Pyodide — *Validated in Phase 4: Full CLI & PyPI Publication*
 
 ### Active
 
@@ -46,17 +48,12 @@ else (CLI, PWA, styling) is delivery; correct extraction cannot fail.
 
 - [ ] Shared, templated XLSX renderer producing nicely-styled output (one sheet per extracted table) — used by both CLI and PWA
 
-**CLI**
-
-- [ ] `contaplus2xlsx` converts a single `.dbf`/`.zip` to one `.xlsx`; multi-company `.zip` selected via a flag
-
 **PWA**
 
 - [ ] Minimal client-side PWA: drag-drop a ContaPlus file, download the styled `.xlsx`, errors surfaced clearly; conversion runs entirely in the browser
 
 **Distribution & tests**
 
-- [ ] Published to PyPI; `uv build` produces a wheel usable for PyPI *and* local dev (editable installs, `micropip` from a local wheel)
 - [ ] Blob-free test suite — synthetic `.dbf`/`.zip` fixtures generated at collection time; existing journal coverage ported
 
 ### Out of Scope
@@ -148,4 +145,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-05-18 after Phase 3 (Full Tables, Balance & Lenient Path) completion*
+*Last updated: 2026-05-19 after Phase 4 (Full CLI & PyPI Publication) completion*
